@@ -124,19 +124,30 @@ def execute_job(job_data: dict) -> dict:
 def main():
     """Main agent loop - listen on vsock and process jobs"""
     print(f"[Agent] Starting on vsock port {VSOCK_PORT}")
-    
+
     # Create vsock socket
     sock = socket.socket(socket.AF_VSOCK, socket.SOCK_STREAM)
 
-    # XXX vm config is passed in a json in the ext packagem so cid/port needs to
-    # be
-    # cid = data["vsock"]["cid"]
-    # port = data["vsock"]["port"]
+    # Read VM configuration from packaged JSON
+    config_path = "config.json"
+    try:
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+        cid = config.get("vsock", {}).get("cid", socket.VMADDR_CID_ANY)
+        port = config.get("vsock", {}).get("port", VSOCK_PORT)
+        print(f"[Agent] Loaded config: CID={cid}, PORT={port}")
+    except FileNotFoundError:
+        print(f"[Agent] Config file not found, using defaults")
+        cid = socket.VMADDR_CID_ANY
+        port = VSOCK_PORT
+    except Exception as e:
+        print(f"[Agent] Error reading config: {e}, using defaults")
+        cid = socket.VMADDR_CID_ANY
+        port = VSOCK_PORT
 
-    sock.bind((VSOCK_CID, VSOCK_PORT))
+    print(f"[Agent] Listening on {cid}:{port}")
+    sock.bind((cid, port))
     sock.listen(1)
-    
-    print(f"[Agent] Listening on {VSOCK_CID}:{VSOCK_PORT}")
     
     while True:
         try:
