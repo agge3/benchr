@@ -17,4 +17,11 @@ apt install -y
 first vps didnt have kvm support (nested virtualizer), so pivoted to DO instead,
 which has nested virtualizer. could have used metal, but pricey
 
+couldnt build linux kernel on macos (need x86). had a server, but without kvm
+enabled. DO wouldnt allow enough cores for compile of linux kernel. home vpn
+wouldnt connect to dev station because of shakey ssh to compile on dev machine.
+deployed multiple cloud vps until finally a build machine. built linux kernel on
+build machine, with perf tied to kernel (kernel needs correct perf), export
+kernel into repo (bad practice, but we dont have a build machine!)
+
 ## dep
