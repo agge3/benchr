@@ -12,7 +12,7 @@ from flask_cors import CORS
 import uuid
 
 sys.path.insert(0, os.path.dirname(__file__))
-from IQueue import 
+from IQueue import GlobalQueue
 from job_cache import JobCache
 
 from config import Config
