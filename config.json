@@ -1,6 +1,6 @@
 {
 	"boot-source": {
-		"kernel_image_path": "vmlinux",
+		"kernel_image_path": "vmlinux-5.10.242-no-acpi",
     	"boot_args": "console=ttyS0 noapic reboot=k panic=1 pci=off random.trust_cpu=on init=/bin/bash"
 	},
 	"drives": [
@@ -19,8 +19,7 @@
 	],
 	"machine-config": {
 		"vcpu_count": 1,
-		"mem_size_mib": 1024,
-		"ht_enabled": false
+		"mem_size_mib": 1024
 	},
 	"vsock": {
 		"guest_cid": 3,
