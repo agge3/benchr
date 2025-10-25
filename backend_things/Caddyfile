@@ -19,7 +19,7 @@
 		header_up Host {host}
 		header_up X-Real-IP {remote_host}
 	}
-		
+	
 	log {
 		output file logs/caddy-access.log {
 			roll_size 10mb
