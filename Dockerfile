@@ -33,6 +33,12 @@ RUN apt install -y \
 	openjdk-11-jdk
 
 RUN apt-get install -y \
-    jc
+	time \
+    jc	\
+	jq
+
+COPY perf-5.10.242 /usr/bin/perf
+RUN chmod +x /usr/bin/perf
 
 COPY init.sh /init.sh
+RUN chmod +x /init.sh

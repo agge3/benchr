@@ -1,5 +1,6 @@
 rootfs.ext4
 deploy.ext4
+rootfs.ext4.bak
 vmlinux*
 firecracker
 backend_things/other_caddys_save_for_later/Caddyfile-local

@@ -6,34 +6,15 @@ import subprocess
 import tempfile
 import os
 import shutil
+import env
+from util import Job, Container, FirecrackerCfg, send_sock, rec_sock, run_cmd, \
+ISerializer, JsonSerializer
 
-EXECUTE_SCRIPT = "execute.sh"
+EXECUTE_SCRIPT = "/mnt/deploy/execute.sh"
 CFG = "vm_config.json"
+# XXX change to scale
 VSOCK_PORT = 5000
-
-def send_sock(sock, data: bytes):
-    """Send length-prefixed message"""
-    sock.sendall(struct.pack(">I", len(data)))
-    sock.sendall(data)
-
-def rec_sock(sock) -> bytes:
-    """Receive length-prefixed message"""
-    raw_len = sock.recv(4)
-    if not raw_len or len(raw_len) < 4:
-        raise RuntimeError("Failed to receive length header")
-    
-    msg_len = struct.unpack(">I", raw_len)[0]
-    
-    chunks = []
-    bytes_received = 0
-    while bytes_received < msg_len:
-        chunk = sock.recv(min(msg_len - bytes_received, 4096))
-        if not chunk:
-            raise RuntimeError("Socket connection broken")
-        chunks.append(chunk)
-        bytes_received += len(chunk)
-    
-    return b''.join(chunks)
+SER = JsonSerializer
 
 def execute_job(job_data: dict) -> dict:
     """Execute the job using execute.sh script"""
@@ -119,7 +100,7 @@ def main():
     try:
         with open(CFG, 'r') as f:
             config = json.load(f)
-        cid = config.get("vsock", {}).get("guest_cid", socket.VMADDR_CID_ANY)
+        cid = config.get("vsock", {}).get("cid", socket.VMADDR_CID_ANY)
         port = config.get("vsock", {}).get("port", VSOCK_PORT)
         print(f"[Agent] Loaded config: CID={cid}, PORT={port}")
     except Exception as e:
@@ -151,15 +132,14 @@ def main():
                 try:
                     # Receive job data: {code, lang, compiler, opts}
                     job_bytes = rec_sock(conn)
-                    job_data = json.loads(job_bytes.decode('utf-8'))
-                    
+                    job_data = SER.deserialize(job_bytes)                    
                     print(f"[Agent] Received job")
                     
                     # Execute job
                     result = execute_job(job_data)
                     
                     # Send result back
-                    result_bytes = json.dumps(result).encode('utf-8')
+                    result_bytes = SER.serialize(result)
                     send_sock(conn, result_bytes)
                     
                     print(f"[Agent] Sent result")
@@ -171,7 +151,7 @@ def main():
                         'error': str(e)
                     }
                     try:
-                        send_sock(conn, json.dumps(error_result).encode('utf-8'))
+                        send_sock(conn, SER.serialize(error_result))
                     except:
                         break
                     

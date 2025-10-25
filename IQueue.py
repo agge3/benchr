@@ -1,8 +1,8 @@
 import queue
-
+from abc import ABC, abstractmethod
 class IQueue:
     def __init__(self, maxsize, env):
-        load_dotenv(env)
+        #load_dotenv(env)
         self._queue = queue.Queue(maxsize=maxsize)
 
     @abstractmethod
@@ -33,7 +33,7 @@ class GlobalQueue(IQueue):
     def __init__(self,
                  maxsize = 1024
                  ):
-        self._queue = IQueue(maxsize)
+        self._queue = queue.Queue(maxsize=maxsize)
 
     def full(self):
         return self._queue.full()
