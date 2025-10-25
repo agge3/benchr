@@ -7,10 +7,8 @@ import tempfile
 import os
 import shutil
 
-# Constants
-VSOCK_CID = socket.VMADDR_CID_ANY
-VSOCK_PORT = 8000  # Should match JobManager
 EXECUTE_SCRIPT = "/opt/execute.sh"
+CFG="vm_config.json"
 
 # env.py is packaged into the fs, so env.XXX for shared from host constants
 
@@ -145,11 +143,8 @@ def main():
         cid = socket.VMADDR_CID_ANY
         port = VSOCK_PORT
 
-    sock.bind((cid, port))
-    sock.listen(1)
-
     print(f"[Agent] Listening on {cid}:{port}")
-    sock.bind((VSOCK_CID, VSOCK_PORT))
+    sock.bind((cid, port))
     sock.listen(1)
     
     while True:

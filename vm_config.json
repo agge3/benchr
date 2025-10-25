@@ -1,1 +1,7 @@
-TEST
+{
+	"vsock": {
+		"cid": 3,
+		"port": 5000,
+		"host_cid": 2
+	}
+}

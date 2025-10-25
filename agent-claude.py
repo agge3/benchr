@@ -6,11 +6,11 @@ import subprocess
 import tempfile
 import os
 import shutil
+import serializer
 
-# Constants
-VSOCK_CID = socket.VMADDR_CID_ANY
-VSOCK_PORT = 8000  # Should match JobManager
-EXECUTE_SCRIPT = "/opt/execute.sh"
+EXECUTE_SCRIPT = "execute.sh"
+CFG="vm_config.json"
+VSOCK_PORT=""
 
 # env.py is packaged into the fs, so env.XXX for shared from host constants
 
@@ -129,9 +129,8 @@ def main():
     sock = socket.socket(socket.AF_VSOCK, socket.SOCK_STREAM)
 
     # Read VM configuration from packaged JSON
-    config_path = "config.json"
     try:
-        with open(config_path, 'r') as f:
+        with open(CFG, 'r') as f:
             config = json.load(f)
         cid = config.get("vsock", {}).get("cid", socket.VMADDR_CID_ANY)
         port = config.get("vsock", {}).get("port", VSOCK_PORT)
@@ -156,11 +155,10 @@ def main():
             print(f"[Agent] Connected: {addr}")
             
             # Handle handshake
-            handshake = conn.recv(64).decode('ascii').strip()
+            msg = rec_sock(sock)
             print(f"[Agent] Received handshake: {handshake}")
             
-            if handshake.startswith("CONNECT"):
-                conn.sendall(b"OK\n")
+            if msg.startswith("CONNECT"):
                 print("[Agent] Handshake complete")
             else:
                 conn.sendall(b"ERROR\n")

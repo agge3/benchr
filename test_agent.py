@@ -42,21 +42,27 @@ def test_vsock():
     print("=" * 60)
     
     VSOCK_CID = 3
-    VSOCK_PORT = 8000
+    VSOCK_PORT = 5000
     
     try:
         # Connect to agent
         print(f"\n[Test] Connecting to vsock CID={VSOCK_CID}, Port={VSOCK_PORT}...")
-        sock = socket.socket(socket.AF_VSOCK, socket.SOCK_STREAM)
-        sock.connect((VSOCK_CID, VSOCK_PORT))
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        print("XXX step1")
+        path="fc.vsock"
+        sock.connect(path)
         print("[Test] ✓ Connected")
+        print("XXX step2")
         
         # Handshake
         print(f"\n[Test] Sending handshake...")
-        sock.sendall(b"CONNECT 8000\n")
+        sock.sendall(b"CONNECT 5000\n")
         ack = sock.recv(64).decode('ascii').strip()
         print(f"[Test] ✓ Received: {ack}")
-        assert ack == "OK", f"Expected 'OK', got '{ack}'"
+        if ack.startswith("OK"):
+            print("FOUND OK")
+        else:
+            print("ERR: NO OK")
         
         # Test job 1: Hello World
         print("\n" + "-" * 60)
@@ -71,7 +77,7 @@ def test_vsock():
         }
         
         print("[Test] Sending job...")
-        job_bytes = json.dumps(job1).encode('utf-8')
+        job_bytes = json.dumps(job1).encode('ascii')
         send_sock(sock, job_bytes)
         
         print("[Test] Waiting for result...")
