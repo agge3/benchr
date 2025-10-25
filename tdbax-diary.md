@@ -14,4 +14,7 @@ apt install -y
     git
 ```
 
+first vps didnt have kvm support (nested virtualizer), so pivoted to DO instead,
+which has nested virtualizer. could have used metal, but pricey
+
 ## dep
