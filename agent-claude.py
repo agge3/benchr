@@ -6,13 +6,10 @@ import subprocess
 import tempfile
 import os
 import shutil
-import serializer
 
 EXECUTE_SCRIPT = "execute.sh"
-CFG="vm_config.json"
-VSOCK_PORT=""
-
-# env.py is packaged into the fs, so env.XXX for shared from host constants
+CFG = "vm_config.json"
+VSOCK_PORT = 5000
 
 def send_sock(sock, data: bytes):
     """Send length-prefixed message"""
@@ -47,11 +44,9 @@ def execute_job(job_data: dict) -> dict:
     
     print(f"[Agent] Executing job, language: {lang}, compiler: {compiler}, opts: {opts}")
     
-    # Create temporary directory for execution
     tmpdir = tempfile.mkdtemp()
     
     try:
-        # Write source code to file
         ext_map = {
             'c': '.c',
             'cpp': '.cpp',
@@ -66,14 +61,13 @@ def execute_job(job_data: dict) -> dict:
         
         result_json_path = os.path.join(tmpdir, "result.json")
         
-        # Execute the bash script
         cmd = [
             EXECUTE_SCRIPT,
-            tmpdir,         # DIR
-            src_file,       # SRC
-            lang,           # LANG
-            compiler,       # COMPILER
-            opts            # OPTS
+            tmpdir,
+            src_file,
+            lang,
+            compiler,
+            opts
         ]
         
         print(f"[Agent] Running: {' '.join(cmd)}")
@@ -82,10 +76,9 @@ def execute_job(job_data: dict) -> dict:
             cmd,
             capture_output=True,
             text=True,
-            timeout=30  # 30 second timeout
+            timeout=30
         )
         
-        # Read the result.json that execute.sh created
         if os.path.exists(result_json_path):
             with open(result_json_path, 'r') as f:
                 result = json.load(f)
@@ -113,7 +106,6 @@ def execute_job(job_data: dict) -> dict:
         }
         print(f"[Agent] Execution error: {e}")
     finally:
-        # Cleanup temp directory
         try:
             shutil.rmtree(tmpdir)
         except:
@@ -123,49 +115,38 @@ def execute_job(job_data: dict) -> dict:
 
 def main():
     """Main agent loop - listen on vsock and process jobs"""
-    print(f"[Agent] Starting on vsock port {VSOCK_PORT}")
-
-    # Create vsock socket
-    sock = socket.socket(socket.AF_VSOCK, socket.SOCK_STREAM)
-
-    # Read VM configuration from packaged JSON
+    # Read VM configuration
     try:
         with open(CFG, 'r') as f:
             config = json.load(f)
-        cid = config.get("vsock", {}).get("cid", socket.VMADDR_CID_ANY)
+        cid = config.get("vsock", {}).get("guest_cid", socket.VMADDR_CID_ANY)
         port = config.get("vsock", {}).get("port", VSOCK_PORT)
         print(f"[Agent] Loaded config: CID={cid}, PORT={port}")
-    except FileNotFoundError:
-        print(f"[Agent] Config file not found, using defaults")
-        cid = socket.VMADDR_CID_ANY
-        port = VSOCK_PORT
     except Exception as e:
         print(f"[Agent] Error reading config: {e}, using defaults")
         cid = socket.VMADDR_CID_ANY
         port = VSOCK_PORT
 
-    print(f"[Agent] Listening on {cid}:{port}")
+    print(f"[Agent] Starting on vsock port {port}")
+    
+    # Create vsock socket
+    sock = socket.socket(socket.AF_VSOCK, socket.SOCK_STREAM)
+    #sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.bind((cid, port))
     sock.listen(1)
     
+    print(f"[Agent] Listening on {cid}:{port}")
+    
     while True:
+        conn = None
         try:
             print("[Agent] Waiting for connection...")
             conn, addr = sock.accept()
             print(f"[Agent] Connected: {addr}")
-            
-            # Handle handshake
-            msg = rec_sock(sock)
-            print(f"[Agent] Received handshake: {handshake}")
-            
-            if msg.startswith("CONNECT"):
-                print("[Agent] Handshake complete")
-            else:
-                conn.sendall(b"ERROR\n")
-                conn.close()
-                continue
+            print("[Agent] Ready to receive jobs (Firecracker handled handshake)")
             
             # Process jobs on this connection
+            # NO handshake needed - Firecracker already sent OK to host
             while True:
                 try:
                     # Receive job data: {code, lang, compiler, opts}
@@ -174,10 +155,10 @@ def main():
                     
                     print(f"[Agent] Received job")
                     
-                    # Execute job - this runs execute.sh and gets result.json
+                    # Execute job
                     result = execute_job(job_data)
                     
-                    # Send result back (result is already the parsed JSON from result.json)
+                    # Send result back
                     result_bytes = json.dumps(result).encode('utf-8')
                     send_sock(conn, result_bytes)
                     
@@ -199,12 +180,15 @@ def main():
             break
         except Exception as e:
             print(f"[Agent] Connection error: {e}")
+            import traceback
+            traceback.print_exc()
             continue
         finally:
-            try:
-                conn.close()
-            except:
-                pass
+            if conn:
+                try:
+                    conn.close()
+                except:
+                    pass
     
     sock.close()
 

@@ -38,31 +38,32 @@ def test_vsock():
     print("=" * 60)
     print("\nPrerequisites:")
     print("1. Firecracker VM must be running")
-    print("2. Agent must be running inside VM on port 8000")
+    print("2. Agent must be running inside VM on port 5000")
     print("=" * 60)
     
+    VSOCK_PATH = "fc.vsock"
     VSOCK_CID = 3
     VSOCK_PORT = 5000
     
     try:
-        # Connect to agent
-        print(f"\n[Test] Connecting to vsock CID={VSOCK_CID}, Port={VSOCK_PORT}...")
+        # Connect to Firecracker vsock
+        print(f"\n[Test] Connecting to vsock at {VSOCK_PATH}...")
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        print("XXX step1")
-        path="fc.vsock"
-        sock.connect(path)
+        sock.connect(VSOCK_PATH)
         print("[Test] ✓ Connected")
-        print("XXX step2")
         
-        # Handshake
-        print(f"\n[Test] Sending handshake...")
-        sock.sendall(b"CONNECT 5000\n")
+        # Send CONNECT command to Firecracker
+        print(f"\n[Test] Sending CONNECT {VSOCK_PORT}...")
+        sock.sendall(f"CONNECT {VSOCK_PORT}\n".encode('ascii'))
+        
+        # Wait for Firecracker's OK response
         ack = sock.recv(64).decode('ascii').strip()
-        print(f"[Test] ✓ Received: {ack}")
-        if ack.startswith("OK"):
-            print("FOUND OK")
-        else:
-            print("ERR: NO OK")
+        print(f"[Test] ✓ Received from Firecracker: {ack}")
+        
+        if not ack.startswith("OK"):
+            raise RuntimeError(f"Firecracker connection failed: {ack}")
+        
+        print("[Test] ✓ Connected to agent via Firecracker")
         
         # Test job 1: Hello World
         print("\n" + "-" * 60)
@@ -77,7 +78,7 @@ def test_vsock():
         }
         
         print("[Test] Sending job...")
-        job_bytes = json.dumps(job1).encode('ascii')
+        job_bytes = json.dumps(job1).encode('utf-8')
         send_sock(sock, job_bytes)
         
         print("[Test] Waiting for result...")
