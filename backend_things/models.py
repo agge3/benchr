@@ -24,9 +24,9 @@ class BaseModel(Model):
 
 class User(BaseModel):
     id = AutoField()
-    username = CharField(unique=True, max_length=255)
-    email = CharField(unique=True, max_length=255)
-    api_key = CharField(unique=True, max_length=64)  # SHA-256 hash
+    username = CharField(unique=True, max_length=255, null=False)
+    email = CharField(unique=True, max_length=255, null=False)
+    # api_key = CharField(unique=True, max_length=64)  # SHA-256 hash
     created_at = DateTimeField(default=datetime.now)
     
     class Meta:
@@ -34,7 +34,7 @@ class User(BaseModel):
 
 class CodeProgram(BaseModel):
     id = AutoField()
-    user_id = ForeignKeyField(User, backref='programs', on_delete='CASCADE')
+    user_id = ForeignKeyField(User, backref='programs', on_delete='CASCADE', null=False)
     title = CharField(max_length=255, null=True)
     code = TextField()
     language = CharField(max_length=50)
@@ -46,7 +46,7 @@ class CodeProgram(BaseModel):
 
 class MetricSnapshot(BaseModel):
     id = AutoField()
-    code_program_id = ForeignKeyField(CodeProgram, backref='snapshots', on_delete='CASCADE')
+    code_program_id = ForeignKeyField(CodeProgram, backref='snapshots', on_delete='CASCADE', null=False)
     timestamp = DateTimeField(default=datetime.now)
     notes = TextField(null=True)
     
@@ -55,7 +55,7 @@ class MetricSnapshot(BaseModel):
 
 class PerfMetrics(BaseModel):
     id = AutoField()
-    snapshot_id = ForeignKeyField(MetricSnapshot, backref='perf', on_delete='CASCADE')
+    snapshot_id = ForeignKeyField(MetricSnapshot, backref='perf', on_delete='CASCADE', null=False)
     cpu_cycles = BigIntegerField()
     instructions = BigIntegerField()
     cache_references = BigIntegerField()
@@ -67,7 +67,7 @@ class PerfMetrics(BaseModel):
 
 class IostatMetrics(BaseModel):
     id = AutoField()
-    snapshot_id = ForeignKeyField(MetricSnapshot, backref='iostat', on_delete='CASCADE')
+    snapshot_id = ForeignKeyField(MetricSnapshot, backref='iostat', on_delete='CASCADE', null=False)
     device = CharField(max_length=50)
     total_reads = FloatField()
     total_writes = FloatField()
@@ -83,7 +83,7 @@ class IostatMetrics(BaseModel):
 
 class VmstatMetrics(BaseModel):
     id = AutoField()
-    snapshot_id = ForeignKeyField(MetricSnapshot, backref='vmstat', on_delete='CASCADE')
+    snapshot_id = ForeignKeyField(MetricSnapshot, backref='vmstat', on_delete='CASCADE', null=False)
     procs_running = IntegerField()
     procs_blocked = IntegerField()
     memory_free_kb = BigIntegerField()

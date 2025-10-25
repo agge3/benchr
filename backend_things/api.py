@@ -1,12 +1,7 @@
 """Flask"""
 import os
 import sys
-<<<<<<< HEAD
 import json
-=======
-#
-# import json
->>>>>>> 79e27a7 (bash miss_yvonne_v5.sh install + bash miss_yvonne_v5.sh start rinse and repeate as needed)
 import logging
 import hashlib
 from datetime import datetime
@@ -16,8 +11,6 @@ from flask_cors import CORS
 import uuid
 sys.path.insert(0, os.path.dirname(__file__))
 from IQueue import GlobalQueue
-from job_cache import JobCache
-
 from config import Config
 from models import User, CodeProgram, create_tables, get_db
 
@@ -39,14 +32,14 @@ cache = None
 
 def init_queue_and_cache():
     global queue, cache
-    queue = RateLimitedQueue(
-        redis_url=Config.REDIS_URL,
-        queue_name=Config.QUEUE_NAME,
-        max_requests=Config.RATE_MAX_REQUESTS,
-        window_seconds=Config.RATE_WINDOW_SEC,
-        max_queue_size=Config.RATE_MAX_QUEUE_SIZE
+    queue = GlobalQueue(
+        # redis_url=Config.REDIS_URL,
+        # queue_name=Config.QUEUE_NAME,
+        # max_requests=Config.RATE_MAX_REQUESTS,
+        # window_seconds=Config.RATE_WINDOW_SEC,
+        maxsize=Config.RATE_MAX_QUEUE_SIZE
     )
-    queue.start()
+    #queue.start()
     
 
 def require_api_key(f):
@@ -103,7 +96,7 @@ def create_job():
         
         user_id = request.current_user.id
         
-        success, message = queue.push(str(uuid7()), user_id)
+        success, message = queue.push(str(uuid()), user_id)
         
         if not success:
             return jsonify({'error': message}), 429
@@ -164,7 +157,7 @@ def get_program(program_id):
             snapshot = snapshots[0]
             perf = list(snapshot.perf.limit(1))
             iostat = list(snapshot.iostat.limit(1))
-            vmstat = list(snapshot.vmstat.limit(1))
+            vmstat = Configlist(snapshot.vmstat.limit(1))
             
             response['metrics'] = {
                 'timestamp': snapshot.timestamp.isoformat(),
