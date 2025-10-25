@@ -1,0 +1,29 @@
+{
+	admin off
+}
+
+:8080 {
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Frame-Options "DENY"
+		X-Content-Type-Options "nosniff"
+		X-XSS-Protection "1; mode=block"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+		-X-Powered-By
+	}
+	
+	encode gzip
+	
+	reverse_proxy localhost:5000 {
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+	}
+		
+	log {
+		output file logs/caddy-access.log {
+			roll_size 10mb
+			roll_keep 5
+		}
+	}
+}
