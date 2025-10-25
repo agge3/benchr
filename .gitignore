@@ -2,3 +2,16 @@ rootfs.ext4
 deploy.ext4
 vmlinux*
 firecracker
+backend_things/other_caddys_save_for_later/Caddyfile-local
+backend_things/other_caddys_save_for_later/other caddy
+/backend_things/data/
+/backend_things/logs/
+/backend_things/venv/
+
+/backend_things/__pycache__/
+/backend_things/notes.txt
+
+
+
+frontend_things/notes.txt
+

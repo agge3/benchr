@@ -1,138 +1,29 @@
-# security hardening
 {
-    # global options
-    admin off  # Disable admin API
-    log {
-        output file /var/log/caddy/access.log
-        format json
-    }
+	admin off
 }
 
-# HTTPS for prod
-i-forgot-domain.com {
-    # rate limiting (need caddy-ratelimit plugin)
-    # xcaddy build --with github.com/mholt/caddy-ratelimit
-    rate_limit {
-        zone api {
-            key {remote_host}
-            events 100
-            window 1m
-        }
-        zone strict_api {
-            key {header.X-API-Key}
-            events 1000
-            window 1h
-        }
-    }
-    
-    # security headers
-    header {
-        # HSTS
-        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
-        
-        # prevent clickjacking
-        X-Frame-Options "DENY"
-        
-        # prevent MIME sniffing
-        X-Content-Type-Options "nosniff"
-        
-        
-        X-XSS-Protection "1; mode=block"
-        
-        
-        Referrer-Policy "strict-origin-when-cross-origin"
-        
-        
-        Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'"
-        
-       
-        Permissions-Policy "geolocation=(), microphone=(), camera=()"
-        
-        # remove server id
-        -Server
-        -X-Powered-By
-    }
-    
-    #gzip compression
-    encode gzip zstd
-    
-   
-    handle /api/* {
-       
-        invoke rate_limit strict_api
-        
-        
-        reverse_proxy localhost:5000 {
-           
-            health_uri /health
-            health_interval 10s
-            health_timeout 5s
-            health_status 200
-            
-            
-            header_up Host {host}
-            header_up X-Real-IP {remote_host}
-            header_up X-Forwarded-For {remote_host}
-            header_up X-Forwarded-Proto {scheme}
-            header_up X-Forwarded-Host {host}
-            
-         
-            transport http {
-                dial_timeout 10s
-                response_header_timeout 30s
-            }
-        }
-    }
-    
-    # Health check 
-    handle /health {
-        reverse_proxy localhost:5000
-    }
-    
-    handle /static/* {
-        root * /var/www/static
-        file_server
-    }
-    
-  
-    handle {
-        respond "Not Found" 404
-    }
-    
-    handle_errors {
-        @4xx expression `{http.error.status_code} >= 400 && {http.error.status_code} < 500`
-        handle @4xx {
-            respond "Client Error" {http.error.status_code}
-        }
-        
-        @5xx expression `{http.error.status_code} >= 500`
-        handle @5xx {
-            respond "Server Error" 500
-        }
-    }
-    
-    log {
-        output file /var/log/caddy/access.log {
-            roll_size 100mb
-            roll_keep 10
-        }
-        format json
-    }
-}
-
-localhost:8080 {
-    # rate limeting, we should change this
-    rate_limit {
-        zone dev {
-            key {remote_host}
-            events 1000
-            window 1m
-        }
-    }
-    
-    invoke rate_limit dev
-    
-    reverse_proxy localhost:5000
-    
-    encode gzip
+:8080 {
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Frame-Options "DENY"
+		X-Content-Type-Options "nosniff"
+		X-XSS-Protection "1; mode=block"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+		-X-Powered-By
+	}
+	
+	encode gzip
+	
+	reverse_proxy localhost:5000 {
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+	}
+		
+	log {
+		output file logs/caddy-access.log {
+			roll_size 10mb
+			roll_keep 5
+		}
+	}
 }
