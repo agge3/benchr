@@ -1,0 +1,29 @@
+{
+	"boot-source": {
+		"kernel_image_path": "vmlinux",
+    	"boot_args": "console=ttyS0 noapic reboot=k panic=1 pci=off random.trust_cpu=on init=/bin/bash"
+	},
+	"drives": [
+		{
+			"drive_id": "rootfs",
+			"path_on_host": "rootfs.ext4",
+			"is_root_device": true,
+			"is_read_only": false
+		},
+		{ 
+			"drive_id": "deploy",
+			"path_on_host": "deploy.ext4",
+			"is_root_device": false,
+			"is_read_only": false
+		}
+	],
+	"machine-config": {
+		"vcpu_count": 1,
+		"mem_size_mib": 1024,
+		"ht_enabled": false
+	},
+	"vsock": {
+		"guest_cid": 3,
+		"uds_path": "fc.vsock"
+	}
+}
