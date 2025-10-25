@@ -1,0 +1,54 @@
+{
+  "job_id": "uuid-or-unique-id",
+  "timestamp": "2025-10-25T12:34:56.789Z",
+  "success": true,
+  "exit_code": 0,
+  "output": "program stdout/stderr output",
+  "asm": "disassembled binary code",
+  "perf": {
+    "cycles": 1234567,
+    "instructions": 987654,
+    "cache_misses": 123,
+    "branch_misses": 45,
+    "ipc": 0.8
+  },
+  "time": {
+    "elapsed": 0.123,
+    "user": 0.100,
+    "system": 0.020,
+    "cpu_percent": 95,
+    "max_rss_kb": 2048
+  },
+  "vmstat": [
+    {
+      "procs_r": 1,
+      "procs_b": 0,
+      "memory_swpd": 0,
+      "memory_free": 524288,
+      "memory_buff": 12345,
+      "memory_cache": 67890,
+      "swap_si": 0,
+      "swap_so": 0,
+      "io_bi": 100,
+      "io_bo": 50,
+      "system_in": 150,
+      "system_cs": 200,
+      "cpu_us": 25,
+      "cpu_sy": 5,
+      "cpu_id": 70,
+      "cpu_wa": 0,
+      "cpu_st": 0
+    }
+  ],
+  "compilation": {
+    "success": true,
+    "error": null,
+    "details": null
+  },
+  "metadata": {
+    "language": "cpp",
+    "compiler": "g++",
+    "opts": "-O2 -Wall",
+    "source_size_bytes": 256
+  }
+}

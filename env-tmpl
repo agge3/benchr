@@ -1,0 +1,18 @@
+# Firecracker paths
+FIRECRACKER_PATH=firecracker
+
+# VSOCK configuration
+VSOCK_CID=3
+VSOCK_PORT=8000
+VSOCK_PATH=/tmp/vm.vsock
+
+# VM configuration
+VM_CONFIG=vm/config.json
+VM_VM_CONFIG=vm/vm_config.json
+
+# Results storage
+RESULTS_DIR=results
+
+# Redis configuration (for future use)
+REDIS_HOST=localhost
+REDIS_PORT=6379
