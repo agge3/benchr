@@ -1,7 +1,7 @@
 {
 	"boot-source": {
 		"kernel_image_path": "vmlinux-5.10.242-no-acpi",
-    	"boot_args": "console=ttyS0 noapic reboot=k panic=1 pci=off random.trust_cpu=on init=/bin/bash"
+    		"boot_args": "console=ttyS0 noapic reboot=k panic=1 pci=off random.trust_cpu=on init=init.sh"
 	},
 	"drives": [
 		{

@@ -24,4 +24,6 @@ deployed multiple cloud vps until finally a build machine. built linux kernel on
 build machine, with perf tied to kernel (kernel needs correct perf), export
 kernel into repo (bad practice, but we dont have a build machine!)
 
+repo split because of www hosting, caused split db and a ton of errors. solution: symlink first and then fix later
+
 ## dep

@@ -2,6 +2,7 @@ rootfs.ext4
 deploy.ext4
 rootfs.ext4.bak
 vmlinux*
+perf*
 firecracker
 backend_things/other_caddys_save_for_later/Caddyfile-local
 backend_things/other_caddys_save_for_later/other caddy
@@ -9,10 +10,23 @@ backend_things/other_caddys_save_for_later/other caddy
 /backend_things/logs/
 /backend_things/venv/
 
-/backend_things/__pycache__/
+__pycache__/
 /backend_things/notes.txt
 
 
 
 frontend_things/notes.txt
 
+node_modules/
+package-lock.json
+build/
+.env
+.env.local
+.env.*.local
+.DS_Store
+*.log
+npm-debug.log*
+.vite/
+
+.venv
+venv

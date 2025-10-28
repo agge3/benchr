@@ -7,14 +7,14 @@ import tempfile
 import os
 import shutil
 import env
-from util import Job, Container, FirecrackerCfg, send_sock, rec_sock, run_cmd, \
+from util import Container, FirecrackerCfg, send_sock, rec_sock, run_cmd, \
 ISerializer, JsonSerializer
 
 EXECUTE_SCRIPT = "/mnt/deploy/execute.sh"
 CFG = "vm_config.json"
 # XXX change to scale
 VSOCK_PORT = 5000
-SER = JsonSerializer
+SER = JsonSerializer()
 
 def execute_job(job_data: dict) -> dict:
     """Execute the job using execute.sh script"""
