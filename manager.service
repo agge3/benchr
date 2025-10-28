@@ -1,1 +1,24 @@
-PLACEHOLDER
+[Unit]
+Description=Benchr Job Manager
+After=network.target api.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/home/benchr/benchr
+
+Environment="PYTHONUNBUFFERED=1"
+Environment="VIRTUAL_ENV=/home/benchr/benchr/.venv"
+#Environment="PATH=/home/benchr/benchr/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=/home/benchr/benchr/.venv/bin/python3 -u /home/benchr/benchr/job_manager.py
+Restart=on-failure
+# maybe clean restart to clear cache? xxx hack to clean cache
+RestartSec=5
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=benchr-jobmanager
+
+[Install]
+WantedBy=multi-user.target
