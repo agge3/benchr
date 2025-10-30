@@ -2,7 +2,8 @@ rootfs.ext4
 deploy.ext4
 rootfs.ext4.bak
 vmlinux*
-perf*
+perf-*/
+perf_*.log
 firecracker
 backend_things/other_caddys_save_for_later/Caddyfile-local
 backend_things/other_caddys_save_for_later/other caddy
