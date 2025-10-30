@@ -183,7 +183,6 @@ def health():
     })
 
     
- }
 @app.route('/api/chat', methods=['POST'])
 def chat():
     """
@@ -193,13 +192,13 @@ def chat():
         "message": "...",
         "result": {...}
     }
-"""
+    """
     try:
         data = request.json
         
         if not data.get('message'):
-            return jsonify({'error': 'Message is required'>
-# TODO: Implement Claude AI integration
+            return jsonify({'error': 'Message is required'}), 400
+        # TODO: Implement Claude AI integration
         # For now, return a placeholder response
 
         message = data['message']
@@ -208,13 +207,12 @@ def chat():
         # Placeholder - integrate with Anthropic Claude API
         response_text = f"Received message: {message}"
         
-        logger.info(f"Chat request received: {message[:50]>
+        logger.info(f"Chat request received: {message[:50]}")
         
         return jsonify({
             'response': response_text
         })
         
     except Exception as e:
-        logger.error(f"Error in chat endpoint: {e}", exc_i>
+        logger.error(f"Error in chat endpoint: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
-})

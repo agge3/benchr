@@ -144,7 +144,6 @@ class JobManager:
                     #print(f"Job {job.job_id} completed: {result}")
 
                     self._c.update(job_id, result)
-                    self._q.pop()
                     
                     # TODO: Update Redis/DB with result
                     # TODO: Signal Flask to update frontend
@@ -153,6 +152,16 @@ class JobManager:
                 except Exception as e:
                     print(f"Error processing job: {e}")
                     # Continue running even if one job fails
+                
+                finally:
+                    # Always remove from processing, success or failure
+                    if job_id:
+                        try:
+                            self._q.pop()
+                            print(f"Job {job_id} removed from processing queue")
+                        except Exception as pop_err:
+                            print(f"Failed to pop job {job_id}: {pop_err}")
+
             else:
                 # No jobs available, sleep briefly
                 time.sleep(0.1)

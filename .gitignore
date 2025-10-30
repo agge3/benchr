@@ -33,4 +33,4 @@ npm-debug.log*
 .venv
 venv
 
-data/
+data
