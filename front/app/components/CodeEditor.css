@@ -1,0 +1,47 @@
+.code-editor-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  position: relative;
+}
+
+.code-editor {
+  flex: 1;
+  min-height: 0;
+}
+
+.diagnostics-panel {
+  max-height: 150px;
+  overflow-y: auto;
+  background: #1e1e1e;
+  border-top: 1px solid #333;
+  padding: 8px;
+}
+
+.diagnostic {
+  padding: 4px 8px;
+  margin-bottom: 4px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+
+.diagnostic.error {
+  background: rgba(255, 0, 0, 0.1);
+  border-left: 3px solid #f44336;
+}
+
+.diagnostic.warning {
+  background: rgba(255, 193, 7, 0.1);
+  border-left: 3px solid #ffc107;
+}
+
+.diagnostic-line {
+  color: #569cd6;
+  margin-right: 8px;
+}
+
+.diagnostic-message {
+  color: #d4d4d4;
+}

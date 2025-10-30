@@ -1,0 +1,33 @@
+.resizable-panel {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  transition: none;
+}
+
+.resize-handle {
+  position: absolute;
+  top: 0;
+  width: 4px;
+  height: 100%;
+  background: #333;
+  cursor: col-resize;
+  z-index: 1000;
+  transition: background 0.2s;
+}
+
+.resize-handle:hover {
+  background: #007acc;
+}
+
+.resize-handle.left {
+  right: 0;
+}
+
+.resize-handle.right {
+  left: 0;
+}
+
+.resizable-panel:has(.resize-handle:active) {
+  user-select: none;
+}

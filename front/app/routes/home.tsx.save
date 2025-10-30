@@ -1,0 +1,330 @@
+import { useState } from 'react';
+import Editor from '@monaco-editor/react';
+import { Play } from 'lucide-react';
+import { ClientOnly } from '~/components/ClientOnly';
+import { Button } from '~/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
+import { ToggleGroup, ToggleGroupItem } from '~/components/ui/toggle-group';
+import { Outlet, Link } from 'react-router';
+
+type Language = 'cpp' | 'python';
+
+interface EditorConfig {
+  code: string;
+  language: Language;
+  compiler: string;
+  opts: string;
+}
+
+interface LanguageConfig {
+  defaultCode: string;
+  compiler: string;
+  opts: string;
+}
+
+interface PanelCardProps {
+  title: string;
+  children: React.ReactNode;
+}
+
+interface LanguageOption {
+  id: Language;
+  label: string;
+}
+
+interface BenchmarkPayload {
+  code: string;
+  language: Language;
+  compiler: string;
+  opts: string;
+}
+
+// Configuration
+const LANGUAGE_CONFIGS: Record<Language, LanguageConfig> = {
+  python: {
+    defaultCode: '# Write your Python code here\nprint("Hello, Benchr!")',
+    compiler: 'python3',
+    opts: ''
+  },
+  cpp: {
+    defaultCode: '// Write your C++ code here\n#include <iostream>\n\nint main() {\n    std::cout << "Hello, Benchr!" << std::endl;\n    return 0;\n}',
+    compiler: 'g++',
+    opts: '-O2 -std=c++17'
+  }
+};
+
+const LANGUAGE_OPTIONS: LanguageOption[] = [
+  { id: 'python', label: 'Python' },
+  { id: 'cpp', label: 'C++' }
+];
+
+/**
+ * Benchmark Service
+ * Handles all API calls related to benchmarking
+ * This isolates API logic from components and hooks
+ */
+const benchmarkService = {
+  /**
+   * Submit a benchmark job
+   */
+  async submitBenchmark(payload: BenchmarkPayload) {
+    try {
+      //const response = await api.post('/benchmark/run', payload);
+      console.log('Benchmark submitted:', payload.code);
+      //return response.data;
+      
+      // Simulate API response
+      return { jobId: 'my_job', status: 'pending' };
+    } catch (error) {
+      console.error('Error running benchmark:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Fetch all metrics for a completed benchmark job
+   * Returns the complete metrics payload from the server
+   */
+  async fetchMetrics(jobId: string) {
+    try {
+      //const response = await api.get(`/benchmark/metrics/${jobId}`);
+      console.log('Fetching all metrics for job:', jobId);
+      //return response.data; // Returns complete metrics payload
+      
+      // The actual API will return all metrics in the payload
+      return null; // Placeholder - real implementation returns full metrics
+    } catch (error) {
+      console.error('Error fetching metrics:', error);
+      throw error;
+    }
+  }
+};
+
+/**
+ * Custom hook to manage editor state and handlers
+ * Encapsulates all editor-related logic
+ */
+function useEditor() {
+  const [editor, setEditor] = useState<EditorConfig>({
+    code: LANGUAGE_CONFIGS.python.defaultCode,
+    language: 'python',
+    compiler: LANGUAGE_CONFIGS.python.compiler,
+    opts: LANGUAGE_CONFIGS.python.opts
+  });
+
+  const handleLanguageChange = (newLang: Language) => {
+    const config = LANGUAGE_CONFIGS[newLang];
+    setEditor({
+      code: config.defaultCode,
+      language: newLang,
+      compiler: config.compiler,
+      opts: config.opts
+    });
+  };
+
+  const handleCodeChange = (code: string) => {
+    setEditor(prev => ({ ...prev, code }));
+  };
+
+  return {
+    editor,
+    handleLanguageChange,
+    handleCodeChange
+  };
+}
+
+/**
+ * Custom hook to handle benchmark operations
+ * Now uses the service layer instead of inline API calls
+ */
+function useBenchmark(editorConfig: EditorConfig) {
+  const handleRunBenchmark = async () => {
+    try {
+      const payload: BenchmarkPayload = {
+        code: editorConfig.code,
+        language: editorConfig.language,
+        compiler: editorConfig.compiler,
+        opts: editorConfig.opts
+      };
+
+      // Call service layer instead of inline API logic
+      const result = await benchmarkService.submitBenchmark(payload);
+      const metrics = await benchmarkService.fetchMetrics(result.jobId);
+      
+      console.log('Benchmark complete:', metrics);
+      return metrics;
+    } catch (error) {
+      console.error('Failed:', error);
+      throw error;
+    }
+  };
+
+  return {
+    handleRunBenchmark
+  };
+}
+
+function PanelCard({ title, children }: PanelCardProps) {
+  return (
+    <Card className="h-full rounded-none border-0 border-b">
+      <CardHeader className="px-4 py-2 border-b bg-muted/50">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="p-0 h-[calc(100%-3rem)] overflow-hidden">
+        {children}
+      </CardContent>
+    </Card>
+  );
+}
+
+interface LanguageSelectorProps {
+  languages: LanguageOption[];
+  currentLanguage: Language;
+  onLanguageChange: (lang: Language) => void;
+}
+
+function LanguageSelector({ languages, currentLanguage, onLanguageChange }: LanguageSelectorProps) {
+  return (
+    <ToggleGroup type="single" value={currentLanguage} onValueChange={(value) => value && onLanguageChange(value as Language)}>
+      {languages.map(({ id, label }) => (
+        <ToggleGroupItem key={id} value={id} aria-label={`Select ${label}`}>
+          {label}
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
+  );
+}
+
+interface HeaderProps {
+  onRunBenchmark: () => void;
+}
+
+function Header({ onRunBenchmark }: HeaderProps) {
+  return (
+    <header className="border-b bg-card">
+      <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex-1"></div>
+
+        <h1 className="text-xl font-semibold">benchr</h1>
+
+        <div className="flex-1 flex items-center justify-end gap-3">
+          <Button onClick={onRunBenchmark}>
+            <Play className="h-4 w-4 mr-2" />
+            Run Benchmark
+          </Button>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function Footer() {
+  return (
+    <footer className="border-t bg-card px-4 py-2">
+      <div className="flex items-center justify-center text-xs text-muted-foreground">
+        <span>benchr © 2025</span>
+      </div>
+    </footer>
+  );
+}
+
+interface EditorPanelProps {
+  code: string;
+  language: Language;
+  onCodeChange: (code: string) => void;
+  onLanguageChange: (lang: Language) => void;
+}
+
+function EditorPanel({ code, language, onCodeChange, onLanguageChange }: EditorPanelProps) {
+  return (
+    <div className="flex flex-col h-full gap-2">
+      <div className="px-4 py-2 bg-muted/50 flex items-center justify-between rounded-lg border">
+        <h2 className="text-sm font-medium">Code Editor</h2>
+        <LanguageSelector
+          languages={LANGUAGE_OPTIONS}
+          currentLanguage={language}
+          onLanguageChange={onLanguageChange}
+        />
+      </div>
+      <div className="flex-1 overflow-hidden rounded-lg border">
+        <div className="h-full bg-[#1e1e1e] pt-1">
+          <ClientOnly
+            fallback={
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                Loading editor...
+              </div>
+            }
+          >
+            {() => (
+              <Editor
+                height="100%"
+                language={language}
+                value={code}
+                onChange={(value) => onCodeChange(value || '')}
+                theme="vs-dark"
+                options={{
+                  minimap: { enabled: false },
+                  fontSize: 14,
+                  lineNumbers: 'on',
+                  scrollBeyondLastLine: false,
+                  automaticLayout: true,
+                }}
+              />
+            )}
+          </ClientOnly>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ResultsPanel() {
+  const [resultView, setResultView] = useState<'performance' | 'insights'>('performance');
+
+  return (
+    <div className="flex flex-col h-full gap-2">
+      <div className="px-4 py-2 bg-muted/50 flex items-center justify-between rounded-lg border">
+        <h2 className="text-sm font-medium">Analysis</h2>
+        <ToggleGroup type="single" value={resultView} onValueChange={(value) => value && setResultView(value as 'performance' | 'insights')}>
+          <ToggleGroupItem value="performance" aria-label="Performance view">
+            Performance
+          </ToggleGroupItem>
+          <ToggleGroupItem value="insights" aria-label="AI Insights view">
+            AI Insights
+          </ToggleGroupItem>
+        </ToggleGroup>
+      </div>
+      <div className="flex-1 overflow-hidden rounded-lg border bg-card flex items-center justify-center">
+        <p className="text-sm text-muted-foreground">Results will appear here</p>
+      </div>
+    </div>
+  );
+}
+
+export default function Home() {
+  const { editor, handleLanguageChange, handleCodeChange } = useEditor();
+  const { handleRunBenchmark } = useBenchmark(editor);
+
+  return (
+    <div className="h-screen flex flex-col bg-background">
+      <Header onRunBenchmark={handleRunBenchmark} />
+
+      <div className="flex-1 flex overflow-hidden gap-4 p-4">
+        <div className="w-1/2">
+          <EditorPanel
+            code={editor.code}
+            language={editor.language}
+            onCodeChange={handleCodeChange}
+            onLanguageChange={handleLanguageChange}
+          />
+        </div>
+
+        <div className="w-1/2">
+          <ResultsPanel />
+        </div>
+      </div>
+
+      <Footer />
+    </div>
+  );
+}
