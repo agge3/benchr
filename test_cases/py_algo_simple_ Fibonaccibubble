@@ -1,0 +1,38 @@
+def fib(n):
+    if n <= 1:
+        return n
+    return fib(n-1) + fib(n-2)
+
+print(f"Fib(25): {fib(25)}")
+
+count = 0
+for num in range(2, 10000):
+    is_prime = True
+    for i in range(2, int(num**0.5) + 1):
+        if num % i == 0:
+            is_prime = False
+            break
+    if is_prime:
+        count += 1
+
+print(f"Primes under 10000: {count}")
+
+total = sum(range(1000000))
+print(f"Sum: {total}")
+
+arr = [64, 34, 25, 12, 22, 11, 90, 88, 45, 50, 23, 67, 32, 91, 15, 
+       72, 58, 41, 37, 29, 81, 63, 55, 48, 19, 76, 84, 92, 13, 68]
+n = len(arr)
+for i in range(n):
+    for j in range(0, n-i-1):
+        if arr[j] > arr[j+1]:
+            arr[j], arr[j+1] = arr[j+1], arr[j]
+print(f"Sorted first 5: {arr[:5]}")
+
+squares = [x**2 for x in range(10000)]
+print(f"Sum of squares: {sum(squares)}")
+
+result = ""
+for i in range(1000):
+    result += str(i)
+print(f"String length: {len(result)}")
