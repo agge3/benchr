@@ -27,6 +27,7 @@ build/
 *.log
 npm-debug.log*
 .vite/
+.react-router/
 
 .venv
 venv

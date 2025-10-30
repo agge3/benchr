@@ -109,7 +109,7 @@ interface JobData {
   compiler: string;
   opts: string;
   status: string;
-  result: any;
+  result: JobResult | null;
   started_at: string;
   completed_at: string | null;
 }
