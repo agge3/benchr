@@ -1,0 +1,21 @@
+def fib(n):
+    if n <= 1:
+        return n
+    return fib(n-1) + fib(n-2)
+
+print(f"Fib(25): {fib(25)}")
+
+count = 0
+for num in range(2, 10000):
+    is_prime = True
+    for i in range(2, int(num**0.5) + 1):
+        if num % i == 0:
+            is_prime = False
+            break
+    if is_prime:
+        count += 1
+
+print(f"Primes under 10000: {count}")
+
+total = sum(range(1000000))
+print(f"Sum: {total}")
