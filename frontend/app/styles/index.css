@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+@theme {
+  /* Brand colors */
+  --color-benchr-gold: #f9d262;
+  --color-benchr-gold-accent: #d4a04c;
+  --color-benchr-gold-hover: #e0b05f;
+  
+  /* Background colors */
+  --color-benchr-bg-main: #1e1e1e;
+  --color-benchr-bg-header: #252526;
+  --color-benchr-bg-elevated: #2d2d2d;
+  
+  /* Border */
+  --color-benchr-border: #374151;
+  
+  /* Text */
+  --color-benchr-text-dark: #1e1e1e;
+  --color-benchr-text-light: #ffffff;
+  --color-benchr-text-muted: #a3a3a3;
+  
+  /* Status */
+  --color-benchr-status-success: #10b981;
+  --color-benchr-status-warning: #f59e0b;
+  --color-benchr-status-error: #ef4444;
+  
+  /* Difficulty */
+  --color-benchr-difficulty-easy: #10b981;
+  --color-benchr-difficulty-medium: #f59e0b;
+  --color-benchr-difficulty-hard: #ef4444;
+}
