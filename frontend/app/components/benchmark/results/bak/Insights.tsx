@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '~/components/ui/button';
-import type { ChatMessage } from '~/types/benchmark.types';
+import type { ChatMessage } from '~/types/benchmark';
 
 export function InsightsView() {
   const [chatInput, setChatInput] = useState('');
@@ -36,7 +36,7 @@ export function InsightsView() {
         {messages.map((message, idx) => (
           <div key={idx} className="flex gap-3">
             {/* Avatar */}
-            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#d4a04c] flex items-center justify-center text-[#1e1e1e] text-xs font-bold shadow-md">
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-benchr-gold-accent flex items-center justify-center text-benchr-text-dark text-xs font-bold shadow-md">
               {message.role === 'assistant' ? 'AI' : 'You'}
             </div>
 
@@ -44,10 +44,10 @@ export function InsightsView() {
             <div className="flex-1">
               <div className={`rounded-lg p-3 shadow-lg ${
                 message.role === 'assistant'
-                  ? 'bg-[#252526]'
-                  : 'bg-[#2d2d30]'
+                  ? 'bg-benchr-bg-header'
+                  : 'bg-benchr-bg-elevated'
               }`}>
-                <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">
+                <p className="text-sm text-benchr-text-light leading-relaxed whitespace-pre-wrap">
                   {message.content}
                 </p>
               </div>
@@ -64,12 +64,12 @@ export function InsightsView() {
           onChange={(e) => setChatInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
           placeholder="Ask Claude about performance optimization..."
-          className="flex-1 bg-[#252526] border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#d4a04c] focus:border-transparent shadow-md transition-all"
+          className="flex-1 bg-benchr-bg-header border border-benchr-border rounded-lg px-4 py-2.5 text-sm text-benchr-text-light placeholder-benchr-text-muted focus:outline-none focus:ring-2 focus:ring-benchr-gold-accent focus:border-transparent shadow-md transition-all"
         />
         <Button
           onClick={handleSendMessage}
           disabled={!chatInput.trim()}
-          className="bg-[#d4a04c] hover:bg-[#e0b05f] text-[#1e1e1e] shadow-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed px-6"
+          className="bg-benchr-gold-accent hover:bg-benchr-gold-hover text-benchr-text-dark shadow-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed px-6"
         >
           Send
         </Button>

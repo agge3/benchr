@@ -1,91 +1,151 @@
 import type { JobData } from '~/services/api';
-import { Metric } from '../Metric';
-import { formatBytes } from '~/utils/format';
+import { Metric } from './Metric';
 
 interface OverviewViewProps {
   jobData: JobData;
 }
 
+/**
+ * Clean up error output for better web display
+ */
+function cleanOutput(output: string): string {
+  let cleaned = output.replace(/\x1b\[[0-9;]*m/g, '');
+  const lines = cleaned.split('\n');
+  const meaningfulLines = lines.filter(line => {
+    const trimmed = line.trim();
+    if (trimmed.length === 0) return false;
+    if (/^\s*\|\s*[~;]+\s*$/.test(line)) return false;
+    if (/^\s*~+\s*$/.test(trimmed)) return false;
+    return true;
+  });
+  return meaningfulLines.join('\n');
+}
+
 export function OverviewView({ jobData }: OverviewViewProps) {
+  const result = jobData.result;
+  if (!result) return null;
+
+  // Determine error state
+  const hasCompilationError = result.compilation && !result.compilation.success;
+  const hasRuntimeError = result.exit_code !== 0 && !hasCompilationError;
+  const hasError = hasCompilationError || hasRuntimeError;
+  const hasOutput = result.output && result.output.trim().length > 0;
+
+  // Extract key metrics from result.time object
+  const executionTime = result.time?.elapsed_time_total_seconds !== undefined
+    ? `${(result.time.elapsed_time_total_seconds * 1000).toFixed(2)} ms`
+    : 'N/A';
+  
+  // Memory is in KB, convert to MB
+  const memoryUsage = result.time?.maximum_resident_set_size
+    ? `${(result.time.maximum_resident_set_size / 1024).toFixed(2)} MB`
+    : 'N/A';
+  
+  const cacheHitRatio = 'Coming Soon'; // Placeholder for future implementation
+
   return (
-    <div className="space-y-4">
-      {/* Quick Summary */}
-      {jobData.result && (
-        <div className={`${
-          jobData.result.success ? 'bg-green-900/20 border-green-700' : 'bg-red-900/20 border-red-700'
-        } border rounded-lg p-4`}>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-4">
-              <span className={`text-lg font-medium ${
-                jobData.result.success ? 'text-green-400' : 'text-red-400'
-              }`}>
-                {jobData.result.success ? '✓ Success' : '✗ Failed'}
-              </span>
-              <span className="text-sm text-gray-400">
-                Exit Code: <span className="font-mono text-gray-200">{jobData.result.exit_code}</span>
-              </span>
-            </div>
-            <div className="text-xs text-gray-500">
-              {new Date(jobData.result.timestamp).toLocaleString()}
-            </div>
-          </div>
-          
-          {/* Key Metrics Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Metric
-              label="Execution Time"
-              value={`${jobData.result.time?.elapsed_time_total_seconds?.toFixed(3) || 'N/A'}s`}
-            />
-            <Metric
-              label="CPU Usage"
-              value={`${jobData.result.time?.cpu_percent || 0}%`}
-            />
-            <Metric
-              label="Memory (RSS)"
-              value={formatBytes((jobData.result.time?.maximum_resident_set_size || 0) * 1024)}
-            />
-            <Metric
-              label="Language"
-              value={jobData.result.metadata?.language || 'N/A'}
-            />
-          </div>
+    <div className="space-y-6">
+      {/* Key Metrics */}
+      <div>
+        <h3 className="text-sm font-medium mb-3 text-benchr-text-light">Key Metrics</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Metric label="Execution Time" value={executionTime} />
+          <Metric label="Memory Usage" value={memoryUsage} />
+          <Metric label="Cache Hit Ratio" value={cacheHitRatio} />
         </div>
-      )}
+      </div>
 
-      {/* Metadata */}
-      {jobData.result?.metadata && (
-        <div className="bg-[#252526] border border-gray-700 rounded-lg p-4">
-          <h3 className="text-sm font-medium mb-3 text-gray-200">Environment</h3>
-          <dl className="grid grid-cols-2 gap-3 text-sm">
-            <dt className="text-gray-400">Language:</dt>
-            <dd className="font-mono text-gray-200">{jobData.result.metadata.language}</dd>
+      {/* Output or Error Section */}
+      <div>
+        {hasError ? (
+          // Error State
+          <>
+            <div className="mb-3 bg-benchr-status-error/20 border-benchr-status-error border rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-benchr-status-error">
+                  {hasCompilationError ? '⚠️ Compilation Failed' : '⚠️ Runtime Error'}
+                </span>
+                <span className="text-xs text-benchr-text-muted">
+                  Exit Code: {result.exit_code}
+                </span>
+              </div>
+            </div>
+            
+            <h3 className="text-sm font-medium mb-3 text-benchr-text-light">Error Details</h3>
+            <pre className="bg-benchr-bg-header border border-benchr-border rounded p-4 text-sm text-benchr-status-error overflow-x-auto whitespace-pre-wrap font-mono">
+              {hasCompilationError
+                ? cleanOutput(result.compilation.details || result.compilation.error || 'Unknown compilation error')
+                : result.output || 'Program exited with non-zero exit code'}
+            </pre>
+          </>
+        ) : hasOutput ? (
+          // Success State with Output
+          <>
+            <h3 className="text-sm font-medium mb-3 text-benchr-text-light">Program Output</h3>
+            <pre className="bg-benchr-bg-main border border-benchr-border rounded p-4 text-sm text-benchr-text-light overflow-x-auto whitespace-pre-wrap font-mono">
+              {result.output}
+            </pre>
+          </>
+        ) : (
+          // Success but No Output
+          <div className="text-center py-6 text-benchr-text-muted text-sm">
+            Program executed successfully with no output
+          </div>
+        )}
+      </div>
 
-            {jobData.result.metadata.interpreter && (
-              <>
-                <dt className="text-gray-400">Interpreter:</dt>
-                <dd className="font-mono text-gray-200">{jobData.result.metadata.interpreter}</dd>
-              </>
-            )}
+      {/* Execution Context */}
+      <div className="bg-benchr-bg-header border border-benchr-border rounded-lg p-4">
+        <h3 className="text-sm font-medium mb-3 text-benchr-text-light">Execution Details</h3>
+        <dl className="grid grid-cols-2 gap-3 text-sm">
+          <dt className="text-benchr-text-muted">Status:</dt>
+          <dd className={`font-mono ${
+            result.exit_code === 0 ? 'text-benchr-status-success' : 'text-benchr-status-error'
+          }`}>
+            {result.exit_code === 0 ? 'Success' : 'Failed'}
+          </dd>
 
-            {jobData.result.metadata.compiler && (
-              <>
-                <dt className="text-gray-400">Compiler:</dt>
-                <dd className="font-mono text-gray-200">{jobData.result.metadata.compiler}</dd>
-              </>
-            )}
+          <dt className="text-benchr-text-muted">Exit Code:</dt>
+          <dd className={`font-mono ${
+            result.exit_code === 0 ? 'text-benchr-status-success' : 'text-benchr-status-error'
+          }`}>
+            {result.exit_code}
+          </dd>
 
-            {jobData.result.metadata.opts && (
-              <>
-                <dt className="text-gray-400">Options:</dt>
-                <dd className="font-mono text-gray-200">{jobData.result.metadata.opts}</dd>
-              </>
-            )}
+          <dt className="text-benchr-text-muted">Language:</dt>
+          <dd className="font-mono text-benchr-text-light">
+            {result.metadata?.language || 'Unknown'}
+          </dd>
 
-            <dt className="text-gray-400">Source Size:</dt>
-            <dd className="text-gray-200">{formatBytes(jobData.result.metadata.source_size_bytes)}</dd>
-          </dl>
-        </div>
-      )}
+          {result.metadata?.compiler && (
+            <>
+              <dt className="text-benchr-text-muted">Compiler:</dt>
+              <dd className="font-mono text-benchr-text-light">
+                {result.metadata.compiler}
+              </dd>
+            </>
+          )}
+
+          {result.metadata?.interpreter && (
+            <>
+              <dt className="text-benchr-text-muted">Interpreter:</dt>
+              <dd className="font-mono text-benchr-text-light">
+                {result.metadata.interpreter}
+              </dd>
+            </>
+          )}
+
+          <dt className="text-benchr-text-muted">CPU Usage:</dt>
+          <dd className="font-mono text-benchr-text-light">
+            {result.time?.cpu_percent !== undefined ? `${result.time.cpu_percent}%` : 'N/A'}
+          </dd>
+
+          <dt className="text-benchr-text-muted">Timestamp:</dt>
+          <dd className="text-benchr-text-light">
+            {new Date(result.timestamp).toLocaleString()}
+          </dd>
+        </dl>
+      </div>
     </div>
   );
 }

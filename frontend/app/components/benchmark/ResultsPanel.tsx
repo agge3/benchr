@@ -2,41 +2,17 @@ import { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Button } from '~/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '~/components/ui/toggle-group';
-import type { JobData } from '~/services/api';
-import type { Language, ResultView } from '~/types/benchmark';
+import type { ResultView } from '~/types/benchmark';
 import { POLLING_CONFIG } from '~/constants/benchmark';
 import { getAvailableViews, getViewConfig } from '~/constants/viewConfig';
+import { useWorkspace } from '~/contexts/WorkspaceContext';
 
-interface ResultsPanelProps {
-  loading: boolean;
-  jobData: JobData | null;
-  error: string | null;
-  cancelled: boolean;
-  pollAttempts: number;
-  onCancel: () => void;
-  language: Language;
-}
-
-export function ResultsPanel({
-  loading,
-  jobData,
-  error,
-  cancelled,
-  pollAttempts,
-  onCancel,
-  language
-}: ResultsPanelProps) {
+export function ResultsPanel() {
+  const { editor, benchmark } = useWorkspace();
   const [resultView, setResultView] = useState<ResultView>('overview');
 
   // Get available views based on language
-  const availableViews = getAvailableViews(language);
-
-  // Auto-switch to compilation tab if compilation failed
-  useEffect(() => {
-    if (jobData?.result?.compilation && !jobData.result.compilation.success) {
-      setResultView('compilation');
-    }
-  }, [jobData]);
+  const availableViews = getAvailableViews(editor.editor.language);
 
   // Find the current view component
   const currentViewConfig = getViewConfig(resultView);
@@ -45,17 +21,17 @@ export function ResultsPanel({
   // Determine what content to show based on state
   const renderContent = () => {
     // Loading state
-    if (loading) {
+    if (benchmark.loading) {
       return (
         <div className="flex flex-col items-center justify-center h-full gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-[#0e639c]" />
-          <p className="text-sm text-gray-400">Running benchmark...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-benchr-gold" />
+          <p className="text-sm text-benchr-text-muted">Running benchmark...</p>
 
-          {pollAttempts > POLLING_CONFIG.CANCEL_BUTTON_DELAY_ATTEMPTS && (
+          {benchmark.pollAttempts > POLLING_CONFIG.CANCEL_BUTTON_DELAY_ATTEMPTS && (
             <Button
-              onClick={onCancel}
+              onClick={benchmark.handleCancel}
               variant="outline"
-              className="mt-4 bg-yellow-500/10 border-yellow-500/50 text-yellow-600 hover:bg-yellow-500/20 hover:text-yellow-700"
+              className="mt-4 bg-benchr-status-warning/10 border-benchr-status-warning/50 text-benchr-status-warning hover:bg-benchr-status-warning/20"
             >
               Cancel?
             </Button>
@@ -65,38 +41,38 @@ export function ResultsPanel({
     }
 
     // Cancelled state
-    if (cancelled) {
+    if (benchmark.cancelled) {
       return (
         <div className="flex items-center justify-center h-full">
-          <p className="text-sm text-gray-400">Benchmark cancelled</p>
+          <p className="text-sm text-benchr-text-muted">Benchmark cancelled</p>
         </div>
       );
     }
 
     // Error state
-    if (error) {
+    if (benchmark.error) {
       return (
         <div className="flex items-center justify-center h-full">
           <div className="text-center">
-            <p className="text-sm font-medium text-red-400 mb-2">Error</p>
-            <p className="text-sm text-gray-400">{error}</p>
+            <p className="text-sm font-medium text-benchr-status-error mb-2">Error</p>
+            <p className="text-sm text-benchr-text-muted">{benchmark.error}</p>
           </div>
         </div>
       );
     }
 
     // No data yet
-    if (!jobData) {
+    if (!benchmark.jobData) {
       return (
         <div className="flex items-center justify-center h-full">
-          <p className="text-sm text-gray-400">Submit code to get started</p>
+          <p className="text-sm text-benchr-text-muted">Submit code to get started</p>
         </div>
       );
     }
 
     // Render the selected view component dynamically
     if (CurrentViewComponent) {
-      return <CurrentViewComponent jobData={jobData} language={language} />;
+      return <CurrentViewComponent jobData={benchmark.jobData} language={editor.editor.language} />;
     }
 
     return null;
@@ -105,8 +81,8 @@ export function ResultsPanel({
   return (
     <div className="flex flex-col h-full gap-2">
       {/* Header with view tabs */}
-      <div className="px-2 sm:px-4 py-2 bg-[#252526] flex items-center gap-3 rounded-lg border border-gray-700 shadow-lg">
-        <h2 className="text-xs sm:text-sm font-medium text-[#d4a04c] whitespace-nowrap flex-shrink-0">
+      <div className="px-2 sm:px-4 py-2 bg-benchr-bg-header flex items-center gap-3 rounded-lg border border-benchr-border shadow-lg">
+        <h2 className="text-xs sm:text-sm font-medium text-benchr-gold-accent whitespace-nowrap flex-shrink-0">
           Analysis
         </h2>
         <div className="flex-1 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
@@ -116,14 +92,13 @@ export function ResultsPanel({
             onValueChange={(value) => value && setResultView(value as ResultView)}
             className="flex-nowrap"
           >
-            {/* Map over available views instead of hardcoding */}
             {availableViews.map(view => (
               <ToggleGroupItem
                 key={view.id}
                 value={view.id}
                 aria-label={view.label}
                 title={view.description}
-                className="data-[state=on]:bg-[#3a3d41] data-[state=on]:text-[#d4a04c] data-[state=off]:text-gray-500 hover:bg-[#2d2d30] shadow-md !text-xs sm:!text-sm px-2 sm:px-3 whitespace-nowrap"
+                className="data-[state=on]:bg-benchr-bg-elevated data-[state=on]:text-benchr-gold-accent data-[state=off]:text-benchr-text-muted hover:bg-benchr-bg-elevated/80 shadow-md !text-xs sm:!text-sm px-2 sm:px-3 whitespace-nowrap"
               >
                 {view.label}
               </ToggleGroupItem>
@@ -133,7 +108,7 @@ export function ResultsPanel({
       </div>
 
       {/* Content area */}
-      <div className="flex-1 overflow-hidden rounded-lg border border-gray-700 bg-[#1e1e1e] shadow-xl">
+      <div className="flex-1 overflow-hidden rounded-lg border border-benchr-border bg-benchr-bg-main shadow-xl">
         <div className="p-6 h-full overflow-auto">
           {renderContent()}
         </div>

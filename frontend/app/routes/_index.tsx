@@ -1,128 +1,162 @@
 import { useState, useRef } from 'react';
 import { Header } from '~/components/layout/Header';
 import { Footer } from '~/components/layout/Footer';
-import { EditorPanel } from '~/components/benchmark/EditorPanel';
+ import { EditorPanel } from '~/components/editor/EditorPanel';
 import { ResultsPanel } from '~/components/benchmark/ResultsPanel';
-import { WorkspaceRow } from '~/components/benchmark/WorkspaceRow';
-import { useWorkspaces } from '~/hooks/UseWorkspaces';
+import { WorkspaceRow } from '~/components/WorkspaceRow';
+import { WorkspaceProvider, useWorkspace } from '~/contexts/WorkspaceContext';
+import { ErrorBoundary } from '~/components/ui/ErrorBoundary';
 import {
   ResizablePanelGroup,
   ResizablePanel,
   ResizableHandle,
 } from "~/components/ui/resizable";
 import type { ImperativePanelHandle } from 'react-resizable-panels';
-import type { Workspace } from '~/hooks/UseWorkspaces';
 
-export default function Home() {
-  const [compareMode, setCompareMode] = useState(false);
-  const [loadingBoth, setLoadingBoth] = useState(false);
-  
-  // Create workspaces (2 for comparison)
-  const workspaces = useWorkspaces(2);
-  const primaryWorkspace = workspaces[0];
-  
-  // Single view refs
+// Helper component to access workspace context in single view
+function SingleViewLayout({ onToggleCompare }: { onToggleCompare: () => void }) {
+  const workspace = useWorkspace();
   const editorPanelRef = useRef<ImperativePanelHandle>(null);
   const resultsPanelRef = useRef<ImperativePanelHandle>(null);
-  
-  // Compare mode row refs
-  const rowRefs = useRef<(ImperativePanelHandle | null)[]>([]);
 
-  // Reset functions
   const resetHorizontalPanels = () => {
     editorPanelRef.current?.resize(50);
     resultsPanelRef.current?.resize(50);
   };
 
+  return (
+    <>
+      <Header
+        onRunBenchmark={workspace.benchmark.handleRunBenchmark}
+        loading={workspace.benchmark.loading}
+        compareMode={false}
+        onToggleCompare={onToggleCompare}
+      />
+
+      <div className="flex-1 min-h-0 p-4 overflow-hidden">
+        <ResizablePanelGroup direction="horizontal" className="h-full gap-4">
+          <ResizablePanel ref={editorPanelRef} defaultSize={50} minSize={30}>
+            <EditorPanel />
+          </ResizablePanel>
+
+          <ResizableHandle withHandle onDoubleClick={resetHorizontalPanels} />
+
+          <ResizablePanel ref={resultsPanelRef} defaultSize={50} minSize={30}>
+            <ResultsPanel />
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      </div>
+    </>
+  );
+}
+
+// Component to wrap each workspace and expose its context
+function WorkspaceItem({ 
+  index, 
+  onRegister 
+}: { 
+  index: number;
+  onRegister: (context: ReturnType<typeof useWorkspace>) => void;
+}) {
+  const workspace = useWorkspace();
+  
+  // Register this workspace with parent on mount
+  useState(() => {
+    onRegister(workspace);
+  });
+
+  return <WorkspaceRow />;
+}
+
+// Compare mode layout with multiple workspaces
+function CompareViewLayout({ 
+  workspaceCount,
+  onToggleCompare 
+}: { 
+  workspaceCount: number;
+  onToggleCompare: () => void;
+}) {
+  const [loadingBoth, setLoadingBoth] = useState(false);
+  const rowRefs = useRef<(ImperativePanelHandle | null)[]>([]);
+  const workspaceRefs = useRef<ReturnType<typeof useWorkspace>[]>([]);
+
   const resetVerticalPanels = () => {
     rowRefs.current.forEach(ref => ref?.resize(50));
   };
 
-  const resetWorkspacePanels = (workspace: Workspace) => {
-    workspace.refs.editor.current?.resize(50);
-    workspace.refs.results.current?.resize(50);
-  };
-
-  // Run all benchmarks simultaneously
   const handleRunBoth = async () => {
     setLoadingBoth(true);
     try {
       await Promise.all(
-        workspaces.map(ws => ws.benchmark.handleRunBenchmark())
+        workspaceRefs.current.map(ws => ws.benchmark.handleRunBenchmark())
       );
     } finally {
       setLoadingBoth(false);
     }
   };
 
+  const registerWorkspace = (index: number) => (ws: ReturnType<typeof useWorkspace>) => {
+    workspaceRefs.current[index] = ws;
+  };
+
   return (
-    <div className="h-screen flex flex-col bg-[#1e1e1e]">
-      <Header 
-        onRunBenchmark={compareMode ? undefined : primaryWorkspace.benchmark.handleRunBenchmark}
-        onRunBoth={compareMode ? handleRunBoth : undefined}
-        loading={compareMode ? false : primaryWorkspace.benchmark.loading}
+    <>
+      <Header
+        onRunBoth={handleRunBoth}
         loadingBoth={loadingBoth}
-        compareMode={compareMode}
-        onToggleCompare={() => setCompareMode(!compareMode)}
+        compareMode={true}
+        onToggleCompare={onToggleCompare}
       />
 
-      {!compareMode ? (
-        // Single view: side by side with resizable panels
-        <div className="flex-1 min-h-0 p-4 overflow-hidden">
-          <ResizablePanelGroup direction="horizontal" className="h-full gap-4">
-            <ResizablePanel ref={editorPanelRef} defaultSize={50} minSize={30}>
-              <EditorPanel
-                code={primaryWorkspace.editor.editor.code}
-                language={primaryWorkspace.editor.editor.language}
-                onCodeChange={primaryWorkspace.editor.handleCodeChange}
-                onLanguageChange={primaryWorkspace.editor.handleLanguageChange}
-              />
-            </ResizablePanel>
-            
-            <ResizableHandle withHandle onDoubleClick={resetHorizontalPanels} />
-            
-            <ResizablePanel ref={resultsPanelRef} defaultSize={50} minSize={30}>
-              <ResultsPanel
-                loading={primaryWorkspace.benchmark.loading}
-                jobData={primaryWorkspace.benchmark.jobData}
-                error={primaryWorkspace.benchmark.error}
-                cancelled={primaryWorkspace.benchmark.cancelled}
-                pollAttempts={primaryWorkspace.benchmark.pollAttempts}
-                onCancel={primaryWorkspace.benchmark.handleCancel}
-                language={primaryWorkspace.editor.editor.language}
-              />
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        </div>
-      ) : (
-        // Compare view: dynamic grid with workspace rows
-        <div className="flex-1 min-h-0 p-4 overflow-hidden">
-          <ResizablePanelGroup direction="vertical" className="h-full gap-4">
-            {workspaces.map((workspace, index) => (
-              <>
-                <ResizablePanel
-                  key={workspace.id}
-                  ref={(el) => (rowRefs.current[index] = el)}
-                  defaultSize={50}
-                  minSize={30}
-                >
-                  <WorkspaceRow
-                    workspace={workspace}
-                    onResetPanels={() => resetWorkspacePanels(workspace)}
+      <div className="flex-1 min-h-0 p-4 overflow-hidden">
+        <ResizablePanelGroup direction="vertical" className="h-full gap-4">
+          {Array.from({ length: workspaceCount }).map((_, index) => (
+            <>
+              <ResizablePanel
+                key={`workspace-${index}`}
+                ref={(el) => (rowRefs.current[index] = el)}
+                defaultSize={50}
+                minSize={30}
+              >
+                <WorkspaceProvider id={`workspace-${index + 1}`}>
+                  <WorkspaceItem 
+                    index={index} 
+                    onRegister={registerWorkspace(index)} 
                   />
-                </ResizablePanel>
-                
-                {/* Add vertical handle between workspaces (but not after the last one) */}
-                {index < workspaces.length - 1 && (
-                  <ResizableHandle withHandle onDoubleClick={resetVerticalPanels} />
-                )}
-              </>
-            ))}
-          </ResizablePanelGroup>
-        </div>
-      )}
+                </WorkspaceProvider>
+              </ResizablePanel>
 
-      <Footer />
-    </div>
+              {index < workspaceCount - 1 && (
+                <ResizableHandle withHandle onDoubleClick={resetVerticalPanels} />
+              )}
+            </>
+          ))}
+        </ResizablePanelGroup>
+      </div>
+    </>
+  );
+}
+
+export default function Home() {
+  const [compareMode, setCompareMode] = useState(false);
+  const [workspaceCount] = useState(2);
+
+  return (
+    <ErrorBoundary>
+      <div className="h-screen flex flex-col bg-[#1e1e1e]">
+        {!compareMode ? (
+          <WorkspaceProvider id="workspace-1">
+            <SingleViewLayout onToggleCompare={() => setCompareMode(true)} />
+          </WorkspaceProvider>
+        ) : (
+          <CompareViewLayout 
+            workspaceCount={workspaceCount}
+            onToggleCompare={() => setCompareMode(false)}
+          />
+        )}
+
+        <Footer />
+      </div>
+    </ErrorBoundary>
   );
 }

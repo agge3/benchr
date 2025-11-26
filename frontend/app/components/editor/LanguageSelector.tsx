@@ -7,12 +7,11 @@ interface LanguageSelectorProps {
   onLanguageChange: (lang: Language) => void;
 }
 
-export function LanguageSelector({ languages, currentLanguage, 
-  onLanguageChange }: LanguageSelectorProps) {
+export function LanguageSelector({ languages, currentLanguage, onLanguageChange }: LanguageSelectorProps) {
   return (
-    <ToggleGroup 
-      type="single" 
-      value={currentLanguage} 
+    <ToggleGroup
+      type="single"
+      value={currentLanguage}
       onValueChange={(value) => value && onLanguageChange(value as Language)}
     >
       {languages.map(({ id, label }) => (
@@ -20,7 +19,7 @@ export function LanguageSelector({ languages, currentLanguage,
           key={id}
           value={id}
           aria-label={`Select ${label}`}
-          className="data-[state=on]:bg-[#3a3d41] data-[state=on]:text-[#d4a04c] data-[state=off]:text-gray-500 hover:bg-[#2d2d30] shadow-md !text-xs sm:!text-sm px-2 sm:px-3"
+          className="data-[state=on]:bg-benchr-bg-elevated data-[state=on]:text-benchr-gold-accent data-[state=off]:text-benchr-text-muted hover:bg-benchr-bg-elevated/80 shadow-md !text-xs sm:!text-sm px-2 sm:px-3"
         >
           {label}
         </ToggleGroupItem>

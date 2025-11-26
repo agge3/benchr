@@ -1,5 +1,5 @@
 import type { JobData } from '~/services/api';
-import { Metric } from '../Metric';
+import { Metric } from './Metric';
 import { SYSTEM_METRICS, getMetricsByCategory } from '~/constants/systemMetrics';
 
 interface SystemViewProps {
@@ -13,7 +13,7 @@ export function SystemView({ jobData }: SystemViewProps) {
   if (!vmstat) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-sm text-gray-400">No system statistics available</p>
+        <p className="text-sm text-benchr-text-muted">No system statistics available</p>
       </div>
     );
   }
@@ -29,14 +29,14 @@ export function SystemView({ jobData }: SystemViewProps) {
       {/* Process Metrics */}
       {processMetrics.length > 0 && (
         <div>
-          <h3 className="text-sm font-medium mb-3 text-gray-200">Process Statistics</h3>
+          <h3 className="text-sm font-medium mb-3 text-benchr-text-light">Process Statistics</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {processMetrics.map(metric => {
               const value = metric.getValue(vmstat);
-              const displayValue = metric.format 
+              const displayValue = metric.format
                 ? metric.format(value)
                 : String(value);
-              
+
               return (
                 <Metric
                   key={metric.key}
@@ -52,14 +52,14 @@ export function SystemView({ jobData }: SystemViewProps) {
       {/* Memory Metrics */}
       {memoryMetrics.length > 0 && (
         <div>
-          <h3 className="text-sm font-medium mb-3 text-gray-200">Memory Statistics</h3>
+          <h3 className="text-sm font-medium mb-3 text-benchr-text-light">Memory Statistics</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {memoryMetrics.map(metric => {
               const value = metric.getValue(vmstat);
-              const displayValue = metric.format 
+              const displayValue = metric.format
                 ? metric.format(value)
                 : String(value);
-              
+
               return (
                 <Metric
                   key={metric.key}
@@ -75,14 +75,14 @@ export function SystemView({ jobData }: SystemViewProps) {
       {/* I/O Metrics */}
       {ioMetrics.length > 0 && (
         <div>
-          <h3 className="text-sm font-medium mb-3 text-gray-200">I/O Statistics</h3>
+          <h3 className="text-sm font-medium mb-3 text-benchr-text-light">I/O Statistics</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {ioMetrics.map(metric => {
               const value = metric.getValue(vmstat);
-              const displayValue = metric.format 
+              const displayValue = metric.format
                 ? metric.format(value)
                 : String(value);
-              
+
               return (
                 <Metric
                   key={metric.key}
@@ -98,14 +98,14 @@ export function SystemView({ jobData }: SystemViewProps) {
       {/* CPU Metrics */}
       {cpuMetrics.length > 0 && (
         <div>
-          <h3 className="text-sm font-medium mb-3 text-gray-200">CPU Statistics</h3>
+          <h3 className="text-sm font-medium mb-3 text-benchr-text-light">CPU Statistics</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {cpuMetrics.map(metric => {
               const value = metric.getValue(vmstat);
-              const displayValue = metric.format 
+              const displayValue = metric.format
                 ? metric.format(value)
                 : String(value);
-              
+
               return (
                 <Metric
                   key={metric.key}

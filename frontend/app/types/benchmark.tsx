@@ -57,5 +57,8 @@ export interface ChatMessage {
   content: string;
 }
 
-export type ResultView = 'overview' | 'execution' | 'performance' 
-	| 'compilation' | 'system' | 'bytecode';
+export type ResultView = 
+  | 'overview'
+  | 'performance'
+  | 'bytecode'
+  | 'system';
