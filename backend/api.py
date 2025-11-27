@@ -1,218 +1,416 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+from quart import Quart, request, jsonify, websocket
+from quart_cors import cors
 from models import db, Job, init_db
 from job_cache import JobCache
-from IQueue import GlobalQueue, RedisQueue
+from rate_limiter import RateLimitedQueue
 import json
-import uuid
 import os
 import logging
 from config import Config
 import sys
+import asyncio
+import redis.asyncio as aioredis
 
 DEBUG = True
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
-# gunicorn does NOT call main, so initialize as free script (global)
+# Logging setup
 os.makedirs('logs', exist_ok=True)
 logging.basicConfig(
-        level=getattr(logging, Config.LOG_LEVEL),
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(Config.LOG_FILE),
-            logging.StreamHandler(sys.stdout)
-        ]
+    level=getattr(logging, Config.LOG_LEVEL),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(Config.LOG_FILE),
+        logging.StreamHandler(sys.stdout)
+    ]
 )
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
-CORS(app, origins=Config.ALLOWED_ORIGINS.split(','))
-queue = RedisQueue(
-        name="benchr",
-        redis_url=os.getenv("REDIS_URL", "redis://localhost:6379/0"),
-        maxsize=Config.RATE_MAX_QUEUE_SIZE
-)
-cache = JobCache()
+app = Quart(__name__)
+app = cors(app, allow_origin=Config.ALLOWED_ORIGINS.split(','))
 
-# each gunicorn worker needs its own connection
-init_db()
-# start is a problem with multithreading, because each gunicorn worker will call start! probably should use connect
-cache.start()
-print("[Flask] Starting API server...")
+# Globals - initialized in startup
+queue: RateLimitedQueue = None
+cache: JobCache = None
+redis_client: aioredis.Redis = None
+pubsub_task: asyncio.Task = None
+
+# Track connected websocket clients per job
+ws_clients: dict[str, set] = {}
+
+
+@app.before_serving
+async def startup():
+    """Initialize async resources before serving"""
+    global queue, cache, redis_client, pubsub_task
+
+    queue = RateLimitedQueue(
+        redis_url=REDIS_URL,
+        queue_name=os.getenv("RATE_QUEUE_NAME", "benchr"),
+        max_requests=int(os.getenv("RATE_MAX_REQUESTS", "100")),
+        window_seconds=int(os.getenv("RATE_WINDOW_SEC", "60")),
+        max_queue_size=int(os.getenv("RATE_MAX_QUEUE_SIZE", "1000"))
+    )
+    await queue.connect()
+
+    cache = JobCache(redis_url=REDIS_URL)
+    await cache.connect()
+
+    redis_client = await aioredis.from_url(REDIS_URL, decode_responses=True)
+
+    init_db()
+    print("[Quart] API server started")
+
+    # Start pubsub listener for job completions
+    pubsub_task = asyncio.create_task(pubsub_listener())
+
+
+@app.after_serving
+async def shutdown():
+    """Cleanup on shutdown"""
+    global queue, cache, redis_client, pubsub_task
+
+    if pubsub_task:
+        pubsub_task.cancel()
+        try:
+            await pubsub_task
+        except asyncio.CancelledError:
+            pass
+
+    if queue:
+        await queue.disconnect()
+    if cache:
+        await cache.disconnect()
+    if redis_client:
+        await redis_client.aclose()
+
+    print("[Quart] API server stopped")
+
+
+async def pubsub_listener():
+    """Listen for job completion notifications and broadcast to websocket clients"""
+    print("[Quart] Starting pubsub listener...")
+
+    async def message_handler(message):
+        print(f"[Quart] Received message: {message}")
+
+        try:
+            raw = message["data"]
+            if isinstance(raw, bytes):
+                raw = raw.decode("utf-8")
+
+            data = json.loads(raw)
+            job_id = str(data.get("job_id"))
+
+            print(f"[Quart] Broadcasting job result for job_id={job_id}")
+
+            if job_id in ws_clients:
+                job_result = data.get("job_result")
+                print(f"[Quart] Found {len(ws_clients[job_id])} subscribers for job {job_id}")
+
+                # Broadcast to all subscribers
+                for client_queue in ws_clients[job_id]:
+                    await client_queue.put(job_result)
+
+                # Remove subscribers after sending result
+                del ws_clients[job_id]
+
+        except Exception as e:
+            print(f"[Quart] Error processing message: {e}")
+
+    try:
+        # Dedicated connection for pubsub
+        pubsub_conn = await aioredis.from_url(REDIS_URL, decode_responses=False)
+        print("[Quart] Pubsub connection created")
+
+        async with pubsub_conn.pubsub() as pubsub:
+            await pubsub.subscribe(**{'job_results': message_handler})
+            print("[Quart] Subscribed to job_results channel")
+
+            # Run forever, processing messages as they arrive
+            await pubsub.run()
+
+    except asyncio.CancelledError:
+        print("[Quart] Pubsub listener cancelled")
+        raise
+    except Exception as e:
+        print(f"[Quart] Pubsub listener FATAL ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        print("[Quart] Pubsub listener cleanup complete")
+
+# =========== WebSocket ===========
+
+@app.websocket('/ws')
+async def ws():
+    """WebSocket endpoint for real-time job updates"""
+    await websocket.accept()
+
+    client_queue = asyncio.Queue()
+    subscribed_jobs = set()
+
+    try:
+        # Handle incoming messages and outgoing notifications concurrently
+        async def receive():
+            while True:
+                data = await websocket.receive_json()
+
+                if data.get('type') == 'subscribe':
+                    job_id = str(data.get('job_id'))
+                    if job_id:
+                        if job_id not in ws_clients:
+                            ws_clients[job_id] = set()
+                        ws_clients[job_id].add(client_queue)
+                        subscribed_jobs.add(job_id)
+                        await websocket.send_json({'type': 'subscribed', 'job_id':
+job_id})
+                        print(f"[WS] Client subscribed to job {job_id}")
+
+                elif data.get('type') == 'unsubscribe':
+                    job_id = str(data.get('job_id'))
+                    if job_id in subscribed_jobs:
+                        subscribed_jobs.discard(job_id)
+                        if job_id in ws_clients:
+                            ws_clients[job_id].discard(client_queue)
+
+        async def send():
+            while True:
+                msg = await client_queue.get()
+                await websocket.send_json(msg)
+
+        # Run both tasks
+        receive_task = asyncio.create_task(receive())
+        send_task = asyncio.create_task(send())
+
+        await asyncio.gather(receive_task, send_task)
+
+    except asyncio.CancelledError:
+        pass
+    finally:
+        # Cleanup subscriptions
+        for job_id in subscribed_jobs:
+            if job_id in ws_clients:
+                ws_clients[job_id].discard(client_queue)
+                if not ws_clients[job_id]:
+                    del ws_clients[job_id]
+
+
+# =========== REST API ===========
 
 @app.route('/api/submit', methods=['POST'])
-def submit_job():
-    """
-    Submit a new job
-    POST /api/submit
-    {
-        "code": "...",
-        "lang": "c",
-        "compiler": "gcc",
-        "opts": "-O2"
-    }
-    """
+async def submit_job():
+    """Submit a new benchmark job"""
     try:
-        data = request.json
-        
-        # Validate
+        data = await request.json
+
+        if DEBUG:
+            print(f"[SUBMIT] Received: {data}")
+
         if not data.get('code'):
             return jsonify({'error': 'Code is required'}), 400
-        
+
         if not data.get('lang'):
             return jsonify({'error': 'Language is required'}), 400
-        
-        # Create job in database
-        # xxx just increment an integer
-        if DEBUG:
-            pass
-            #print(f"job received: {job_id}")
-        #logger.info(f"job received: {job_id}")
-        
-        job = Job.create(
+
+        # Create job in database (sync peewee, run in executor)
+        loop = asyncio.get_event_loop()
+        job = await loop.run_in_executor(None, lambda: Job.create(
             code=data['code'],
             lang=data['lang'],
             compiler=data.get('compiler', 'gcc'),
-            compiler_opts=data.get('opts', '-O2'),
+            opts=data.get('opts', '-O2'),
             status='queued'
-        )
+        ))
 
-        
-        #print(f"[Flask] Created job: {job_id}")
-        
-        # Add to queue (JobManager will pick it up)
-        queue.push(job.id)
+        print(f"[SUBMIT] Job created: ID={job.id}")
 
-        if DEBUG:
-            print(f"queue size: {queue.size()}")
-        logging.info(f"queue size: {queue.size()}")
-        
-        #print(f"[Flask] Queued job: {job_id}")
-        
-        # xxx how to handle request submit??
+        # Add to rate-limited queue
+        success = await queue.push(job.id)
+
+        if not success:
+            # Rate limited or queue full
+            await loop.run_in_executor(None, lambda: Job.delete_by_id(job.id))
+            return jsonify({'error': 'Rate limit exceeded or queue full'}), 429
+
+        queue_size = await queue.size()
+        print(f"[SUBMIT] Job {job.id} queued. Queue size: {queue_size}")
+
         return jsonify({
             'job_id': job.id,
             'status': 'queued'
         }), 201
-        
+
     except Exception as e:
-        print(f"[Flask] Error submitting job: {e}")
+        print(f"[SUBMIT] ERROR: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/current', methods=['GET'])
-def get_current_job():
-    """
-    Get the most recent job (for single-job testing)
-    GET /api/current
-    """
-    try:
-        # xxx not done well
-        # Get most recent job
-        job = Job.select().order_by(Job.created_at.desc()).first()
-        
-        if not job:
-            return jsonify({'job': None})
-        
-        # XXX MAY NEED REFACTOR
 
-        # Get full job data with metrics
-        job_data = cache.get(job.id)
-        
-        return jsonify({'job': job_data})
-        
-    except Exception as e:
-        print(f"[Flask] Error getting current job: {e}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/jobs/<id>', methods=['GET'])
-def get_job(id):
+@app.route('/api/jobs/<int:id>', methods=['GET'])
+async def get_job(id):
+    """Get job by ID"""
     try:
-        logger.debug(f"Getting job ID: {id}, type: {type(id)}")
-        
-        #job_data = cache.get(id)
-        job = Job.get_by_id(int(id))
+        print(f"[GET_JOB] Fetching job ID: {id}")
+
+        loop = asyncio.get_event_loop()
+        job = await loop.run_in_executor(None, lambda: Job.get_by_id(id))
+
         job_data = dict(job.__data__)
+
         if job_data.get('result'):
             job_data['result'] = json.loads(job_data['result'])
-        
-        logger.debug(f"job_data from cache: {job_data}")
-        logger.debug(f"job_data type: {type(job_data)}")
-        
-        if not job_data:
-            logger.warning(f"Job not found in cache/db: {id}")
-            return jsonify({'error': 'Job not found'}), 404
 
-        logger.info(f"Returning job {id} with status: {job_data.get('status')}")
+        print(f"[GET_JOB] Returning job {id}: status={job_data.get('status')}")
         return jsonify(job_data)
 
     except Exception as e:
-        logger.error(f"Error getting job {id}: {e}", exc_info=True)
+        print(f"[GET_JOB] ERROR for job {id}: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+
+@app.route('/api/current', methods=['GET'])
+async def get_current_job():
+    """Get most recent job"""
+    try:
+        loop = asyncio.get_event_loop()
+        job = await loop.run_in_executor(
+            None,
+            lambda: Job.select().order_by(Job.created_at.desc()).first()
+        )
+
+        if not job:
+            return jsonify({'job': None})
+
+        job_data = await cache.get(job.id)
+        return jsonify({'job': job_data})
+
+    except Exception as e:
+        print(f"[CURRENT] ERROR: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/jobs', methods=['GET'])
-def list_jobs():
-    """
-    List all jobs (newest first)
-    GET /api/jobs?limit=10
-    """
+async def list_jobs():
+    """List jobs (newest first)"""
     try:
         limit = int(request.args.get('limit', 10))
-        
-        jobs = Job.select().order_by(Job.created_at.desc()).limit(limit)
-        
+
+        loop = asyncio.get_event_loop()
+        jobs = await loop.run_in_executor(
+            None,
+            lambda: list(Job.select().order_by(Job.created_at.desc()).limit(limit))
+        )
+
         job_list = [{
             'job_id': job.id,
             'lang': job.lang,
             'compiler': job.compiler,
             'status': job.status,
             'created_at': job.created_at.isoformat(),
-            'completed_at': job.completed_at.isoformat() if job.completed_at else None
+            'completed_at': job.completed_at.isoformat() if job.completed_at else
+None
         } for job in jobs]
-        
+
         return jsonify({'jobs': job_list})
-        
+
     except Exception as e:
-        print(f"[Flask] Error listing jobs: {e}")
+        print(f"[LIST_JOBS] ERROR: {e}")
         return jsonify({'error': str(e)}), 500
 
+
 @app.route('/api/health', methods=['GET'])
-def health():
-    """Health check endpoint"""
+async def health():
+    """Health check"""
     return jsonify({
         'status': 'ok',
         'database': 'connected' if not db.is_closed() else 'disconnected'
     })
 
-    
-@app.route('/api/chat', methods=['POST'])
-def chat():
-    """
-    Send a message to Claude AI for code analysis
-    POST /api/chat
-    {
-        "message": "...",
-        "result": {...}
-    }
-    """
+
+# =========== Saved Benchmarks ===========
+
+@app.route('/api/saved', methods=['POST'])
+async def save_benchmark():
+    """Save a job as a benchmark"""
     try:
-        data = request.json
-        
+        data = await request.json
+        job_id = data.get('job_id')
+        name = data.get('name')
+
+        if not job_id:
+            return jsonify({'error': 'job_id is required'}), 400
+
+        benchmark_id = await cache.save_benchmark(job_id, name)
+
+        if benchmark_id:
+            return jsonify({'benchmark_id': benchmark_id}), 201
+        else:
+            return jsonify({'error': 'Failed to save benchmark'}), 500
+
+    except Exception as e:
+        print(f"[SAVE] ERROR: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/saved/<int:id>', methods=['GET'])
+async def get_saved_benchmark(id):
+    """Get saved benchmark by ID (cached)"""
+    try:
+        data = await cache.get_saved(id)
+
+        if data:
+            return jsonify(data)
+        else:
+            return jsonify({'error': 'Benchmark not found'}), 404
+
+    except Exception as e:
+        print(f"[GET_SAVED] ERROR: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/saved/<int:id>', methods=['DELETE'])
+async def delete_saved_benchmark(id):
+    """Delete saved benchmark"""
+    try:
+        success = await cache.delete_saved(id)
+
+        if success:
+            return jsonify({'status': 'deleted'}), 200
+        else:
+            return jsonify({'error': 'Failed to delete'}), 500
+
+    except Exception as e:
+        print(f"[DELETE_SAVED] ERROR: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/chat', methods=['POST'])
+async def chat():
+    """Claude AI chat endpoint (placeholder)"""
+    try:
+        data = await request.json
+
         if not data.get('message'):
             return jsonify({'error': 'Message is required'}), 400
-        # TODO: Implement Claude AI integration
-        # For now, return a placeholder response
 
         message = data['message']
         result = data.get('result')
-        
-        # Placeholder - integrate with Anthropic Claude API
+
+        # TODO: Implement Claude AI integration
         response_text = f"Received message: {message}"
-        
-        logger.info(f"Chat request received: {message[:50]}")
-        
-        return jsonify({
-            'response': response_text
-        })
-        
+
+        print(f"Chat request received: {message[:50]}")
+
+        return jsonify({'response': response_text})
+
     except Exception as e:
-        logger.error(f"Error in chat endpoint: {e}", exc_info=True)
+        print(f"Error in chat endpoint: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
