@@ -28,9 +28,3 @@ export const LANGUAGE_OPTIONS: LanguageOption[] = [
   { id: 'cpp', label: 'C++' },
   { id: 'c', label: 'C' }
 ];
-
-export const POLLING_CONFIG = {
-  MAX_ATTEMPTS: 15,
-  POLL_INTERVAL_MS: 2000,
-  CANCEL_BUTTON_DELAY_ATTEMPTS: 1
-};

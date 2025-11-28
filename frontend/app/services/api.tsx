@@ -1,7 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:5000/api' 
-                                         : 'https://www.benchr.cc/api';
+const API_BASE_URL = 'https://www.benchr.cc/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -10,6 +9,35 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // Request timed out
+    if (error.code === 'ECONNABORTED') {
+      return Promise.reject(new Error('Request timed out. Please try again.'));
+    }
+
+    // Network error (offline, DNS failure, etc.)
+    if (!error.response) {
+      return Promise.reject(new Error('Network error. Check your connection.'));
+    }
+
+    // Server errors
+    if (error.response.status >= 500) {
+      return Promise.reject(new Error('Server error. Please try again later.'));
+    }
+
+    // Rate limiting
+    if (error.response.status === 429) {
+      return Promise.reject(new Error('Too many requests. Please slow down.'));
+    }
+
+    // Pass through other errors with their message if available
+    const message = error.response?.data?.message || error.message;
+    return Promise.reject(new Error(message));
+  }
+);
 
 // Payload structure matching the database schema
 interface BenchmarkPayload {

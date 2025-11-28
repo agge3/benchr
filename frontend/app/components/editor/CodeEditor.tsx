@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import Editor from '@monaco-editor/react';
 import { ClientOnly } from '~/components/ui/ClientOnly';
 import { ErrorBoundary } from '~/components/ui/ErrorBoundary';
+import { defineAndSetBenchrTheme, BENCHR_THEME_NAME } from '~/constants/monacoTheme';
 import type { editor } from 'monaco-editor';
 
 interface CodeEditorProps {
@@ -17,7 +18,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   value,
   onChange,
   language,
-  theme = 'vs-dark',
+  theme = BENCHR_THEME_NAME,
   readOnly = false,
   onSave
 }) => {
@@ -25,7 +26,9 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 
   const handleEditorMount = (editor: editor.IStandaloneCodeEditor, monaco: any) => {
     editorRef.current = editor;
-    
+
+    defineAndSetBenchrTheme(monaco);
+
     // Add save command
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
       onSave?.();

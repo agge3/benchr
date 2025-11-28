@@ -8,7 +8,10 @@ interface BytecodeViewProps {
 }
 
 export function BytecodeView({ jobData, language }: BytecodeViewProps) {
-  if (!jobData?.result?.asm) {
+  // Handle double-nested result structure
+  const result = jobData?.result?.result || jobData?.result;
+
+  if (!result?.asm) {
     return (
       <div className="flex items-center justify-center h-full">
         <p className="text-sm text-benchr-text-muted">No bytecode available</p>
@@ -18,7 +21,7 @@ export function BytecodeView({ jobData, language }: BytecodeViewProps) {
 
   return (
     <div className="h-full -m-6">
-      <AssemblyViewer assembly={jobData.result.asm} />
+      <AssemblyViewer assembly={result.asm} />
     </div>
   );
 }

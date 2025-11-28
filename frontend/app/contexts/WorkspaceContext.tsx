@@ -2,6 +2,8 @@ import { createContext, useContext, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { useEditor } from '~/hooks/UseEditor';
 import { useBenchmark } from '~/hooks/UseBenchmark';
+import { useWebSocketContext } from '~/contexts/WebSocketContext';
+import type { WebSocketHook } from '~/hooks/useWebSocket';
 import type { ImperativePanelHandle } from 'react-resizable-panels';
 
 interface WorkspaceContextValue {
@@ -12,6 +14,7 @@ interface WorkspaceContextValue {
     editor: React.RefObject<ImperativePanelHandle>;
     results: React.RefObject<ImperativePanelHandle>;
   };
+  ws: WebSocketHook;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
@@ -23,7 +26,9 @@ interface WorkspaceProviderProps {
 
 export function WorkspaceProvider({ id, children }: WorkspaceProviderProps) {
   const editor = useEditor();
-  const benchmark = useBenchmark(editor.editor);
+  const ws = useWebSocketContext();
+  const benchmark = useBenchmark(editor.editor, ws);
+
   const editorRef = useRef<ImperativePanelHandle>(null);
   const resultsRef = useRef<ImperativePanelHandle>(null);
 
@@ -35,6 +40,7 @@ export function WorkspaceProvider({ id, children }: WorkspaceProviderProps) {
       editor: editorRef,
       results: resultsRef,
     },
+    ws,
   };
 
   return (

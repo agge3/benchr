@@ -1,30 +1,27 @@
 @import "tailwindcss";
 
 @theme {
-  /* Brand colors */
-  --color-benchr-gold: #f9d262;
-  --color-benchr-gold-accent: #d4a04c;
-  --color-benchr-gold-hover: #e0b05f;
+  --color-benchr-gold: #ffeb3b;
+  --color-benchr-gold-accent: #fdd835;
+  --color-benchr-gold-hover: #ffee58;
   
-  /* Background colors */
-  --color-benchr-bg-main: #1e1e1e;
-  --color-benchr-bg-header: #252526;
-  --color-benchr-bg-elevated: #2d2d2d;
+  /* Background colors - Dark slate */
+  --color-benchr-bg-main: #0a0e14;
+  --color-benchr-bg-header: #11151c;
+  --color-benchr-bg-elevated: #1a1f2e;
   
-  /* Border */
-  --color-benchr-border: #374151;
+  /* Border - Blue-gray */
+  --color-benchr-border: #2e3440;
   
   /* Text */
-  --color-benchr-text-dark: #1e1e1e;
-  --color-benchr-text-light: #ffffff;
-  --color-benchr-text-muted: #a3a3a3;
+  --color-benchr-text-dark: #0a0e14;
+  --color-benchr-text-light: #e5e9f0;
+  --color-benchr-text-muted: #7b88a1;
   
-  /* Status */
+  /* Status/Difficulty - Keep these */
   --color-benchr-status-success: #10b981;
   --color-benchr-status-warning: #f59e0b;
   --color-benchr-status-error: #ef4444;
-  
-  /* Difficulty */
   --color-benchr-difficulty-easy: #10b981;
   --color-benchr-difficulty-medium: #f59e0b;
   --color-benchr-difficulty-hard: #ef4444;

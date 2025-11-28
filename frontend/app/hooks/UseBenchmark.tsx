@@ -1,153 +1,144 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import benchmarkService from '~/services/api';
 import type { BenchmarkPayload, JobData } from '~/services/api';
 import type { EditorConfig } from '~/types/benchmark';
-import { POLLING_CONFIG } from '~/constants/benchmark';
+import type { WebSocketHook } from './useWebSocket';
 
-/**
- * Custom hook to handle benchmark operations with polling
- */
-export function useBenchmark(editorConfig: EditorConfig) {
+const CANCEL_BUTTON_DELAY_MS = 3000;
+const JOB_TIMEOUT_MS = 30000;
+
+export function useBenchmark(editorConfig: EditorConfig, ws: WebSocketHook) {
   const [loading, setLoading] = useState(false);
   const [jobData, setJobData] = useState<JobData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cancelled, setCancelled] = useState(false);
-  const [pollAttempts, setPollAttempts] = useState(0);
-  const [cancelledRef, setCancelledRef] = useState({ current: false });
+  const [showCancelButton, setShowCancelButton] = useState(false);
 
-  const pollForResults = async (jobId: int, maxAttempts = POLLING_CONFIG.MAX_ATTEMPTS) => {
-    let attempts = 0;
+  // Refs to track current job and timers
+  const currentJobId = useRef<string | null>(null);
+  const cancelTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
 
-    const poll = async (): Promise<JobData | null> => {
-      // Check if user cancelled - stop immediately
-      if (cancelledRef.current) {
-        return null;
-      }
+  // Cleanup function to clear timers and reset UI state
+  const cleanup = useCallback(() => {
+    if (cancelTimerRef.current) {
+      clearTimeout(cancelTimerRef.current);
+      cancelTimerRef.current = null;
+    }
+    if (timeoutTimerRef.current) {
+      clearTimeout(timeoutTimerRef.current);
+      timeoutTimerRef.current = null;
+    }
+    if (unsubscribeRef.current) {
+      unsubscribeRef.current();
+      unsubscribeRef.current = null;
+    }
+    setShowCancelButton(false);
+  }, []);
 
-      attempts++;
-      setPollAttempts(attempts);
-
-      try {
-        // Poll the specific job by ID
-        const job = await benchmarkService.getJobById(jobId);
-
-        // Check again after async call
-        if (cancelledRef.current) {
-          return null;
-        }
-
-        if (!job) {
-          // Job not found yet - keep polling
-          console.log(`Polling ${attempts}/${maxAttempts} - Job not found yet, retrying...`);
-
-          if (attempts >= maxAttempts) {
-            throw new Error('Polling timeout - job took too long');
-          }
-
-          await new Promise(resolve => setTimeout(resolve, POLLING_CONFIG.POLL_INTERVAL_MS));
-          return poll();
-        }
-
-        // Check if job is complete (has perf metrics or failed)
-        if (job.status === 'completed' && job.result) {
-          console.log('Job completed with metrics:', job.result);
-          return job;
-        }
-
-        // Check for compilation failure - stop polling and return the job with error
-        if (job.result && job.result.compilation && !job.result.compilation.success) {
-          console.log('Compilation failed:', job.result.compilation);
-          return job; // Return job even with compilation failure so we can display the error
-        }
-
-        if (job.status === 'failed') {
-          console.log('Job failed:', job);
-          return job; // Return the job so we can show the error details
-        }
-
-        // Still processing - poll again
-        if (attempts >= maxAttempts) {
-          throw new Error('Polling timeout - job took too long');
-        }
-
-        console.log(`Polling ${attempts}/${maxAttempts} - Status: ${job.status}`);
-
-        // Wait before next poll
-        await new Promise(resolve => setTimeout(resolve, POLLING_CONFIG.POLL_INTERVAL_MS));
-        return poll(); // Recursive poll
-
-      } catch (err) {
-        // Check if cancelled
-        if (cancelledRef.current) {
-          return null;
-        }
-
-        // If it's an axios error (network/500 error), keep polling
-        if (attempts < maxAttempts) {
-          console.log(`Polling ${attempts}/${maxAttempts} - Error occurred, retrying...`, err);
-          await new Promise(resolve => setTimeout(resolve, POLLING_CONFIG.POLL_INTERVAL_MS));
-          return poll(); // Keep polling even on errors
-        }
-
-        // Only throw if we've exhausted all attempts
-        throw new Error('Polling failed after maximum attempts');
-      }
-    };
-
-    return poll();
-  };
+  // Full reset
+  const reset = useCallback(() => {
+    currentJobId.current = null;
+    cleanup();
+  }, [cleanup]);
 
   const handleRunBenchmark = async () => {
+    // Check socket connection before starting
+    if (!ws.connected) {
+      setError('Connection lost. Please refresh the page.');
+      return;
+    }
+
+    // Clean up any previous run
+    reset();
+
+    // Reset state for new run
     setLoading(true);
     setError(null);
     setCancelled(false);
     setJobData(null);
-    setPollAttempts(0);
-    setCancelledRef({ current: false });
+
+    // Start timer for cancel button (shows after 3s)
+    cancelTimerRef.current = setTimeout(() => {
+      setShowCancelButton(true);
+    }, CANCEL_BUTTON_DELAY_MS);
 
     try {
-      // Step 1: Submit the job
       const payload: BenchmarkPayload = {
         code: editorConfig.code,
         lang: editorConfig.language,
         compiler: editorConfig.compiler,
-        opts: editorConfig.opts
+        opts: editorConfig.opts,
       };
 
       const result = await benchmarkService.submitJob(payload);
-      console.log('Job submitted:', result.job_id);
+      currentJobId.current = result.job_id;
 
-      // Step 2: Poll for results
-      const completedJob = await pollForResults(result.job_id);
+      // Start timeout timer (fails after 30s)
+      timeoutTimerRef.current = setTimeout(() => {
+        if (currentJobId.current === result.job_id) {
+          setError('Benchmark timed out. The server may be overloaded.');
+          cleanup();
+          setLoading(false);
+          currentJobId.current = null;
+        }
+      }, JOB_TIMEOUT_MS);
 
-      // Only set job data if not cancelled and job exists
-      if (completedJob && !cancelledRef.current) {
-        setJobData(completedJob);
-      } else if (cancelledRef.current) {
-        // User cancelled - show cancelled state
-        setCancelled(true);
-      }
+      // Subscribe to WebSocket for this job
+      ws.subscribe(result.job_id);
 
+      // Listen for completion
+      unsubscribeRef.current = ws.onJobComplete(async (completedJobId: string) => {
+		console.log('[Benchmark] onJobComplete called:', completedJobId, 'currentJobId:', currentJobId.current);
+
+        // Ignore if this isn't our current job (stale notification)
+        if (completedJobId !== String(currentJobId.current)) {
+          console.log('[Benchmark] Job ID mismatch, ignoring');
+          return;
+        }
+
+        console.log('[Benchmark] Fetching job result...');
+
+        // Clear timeout since we got a response
+        if (timeoutTimerRef.current) {
+          clearTimeout(timeoutTimerRef.current);
+          timeoutTimerRef.current = null;
+        }
+
+        try {
+          const completedJob = await benchmarkService.getJobById(currentJobId.current!);
+          setJobData(completedJob);
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : 'Failed to fetch result';
+          setError(errorMessage);
+        } finally {
+          cleanup();
+          setLoading(false);
+          currentJobId.current = null;
+        }
+      });
     } catch (err) {
-      // Only show error if not cancelled
-      if (!cancelledRef.current) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to run benchmark';
-        console.error('Benchmark error:', errorMessage);
-        setError(errorMessage);
-      }
-    } finally {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to run benchmark';
+      setError(errorMessage);
+      cleanup();
       setLoading(false);
-      setPollAttempts(0);
+      currentJobId.current = null;
     }
   };
 
   const handleCancel = () => {
-    console.log('User cancelled benchmark');
-    setCancelledRef({ current: true });
+    reset();
     setLoading(false);
     setCancelled(true);
-    setPollAttempts(0);
   };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      reset();
+    };
+  }, [reset]);
 
   return {
     handleRunBenchmark,
@@ -156,6 +147,7 @@ export function useBenchmark(editorConfig: EditorConfig) {
     jobData,
     error,
     cancelled,
-    pollAttempts
+    showCancelButton,
+    socketConnected: ws.connected,
   };
 }

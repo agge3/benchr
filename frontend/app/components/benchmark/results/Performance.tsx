@@ -13,15 +13,18 @@ interface PerformanceViewProps {
 }
 
 export function PerformanceView({ jobData }: PerformanceViewProps) {
+  // Handle double-nested result structure
+  const result = jobData.result?.result || jobData.result;
+
   return (
     <div className="space-y-4">
       {/* Timing Metrics Grid - Config-Driven */}
-      {jobData.result?.time && (
+      {result?.time && (
         <div>
           <h3 className="text-sm font-medium mb-3 text-benchr-text-light">Timing Metrics</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {TIMING_METRICS.map(metric => {
-              const value = metric.getValue(jobData.result.time);
+              const value = metric.getValue(result.time);
               const displayValue = metric.format
                 ? metric.format(value)
                 : String(value);
@@ -39,17 +42,17 @@ export function PerformanceView({ jobData }: PerformanceViewProps) {
       )}
 
       {/* Hardware Counters - Dynamic Table */}
-      {jobData.result?.perf && Object.keys(jobData.result.perf).length > 0 && (
+      {result?.perf && Object.keys(result.perf).length > 0 && (
         <MetricsTable
           title="Hardware Counters"
-          data={jobData.result.perf}
+          data={result.perf}
           formatLabel={formatMetricLabel}
           formatValue={formatMetricValue}
         />
       )}
 
       {/* Legacy Perf Data - Config-Driven Table */}
-      {!jobData.result && jobData.perf && (
+      {!result && jobData.perf && (
         <div>
           <h3 className="text-sm font-medium mb-3 text-benchr-text-light">Performance Metrics (Legacy)</h3>
           <div className="rounded-lg border border-benchr-border overflow-hidden bg-benchr-bg-main shadow-lg">

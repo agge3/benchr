@@ -1,5 +1,5 @@
 import { ToggleGroup, ToggleGroupItem } from '~/components/ui/toggle-group';
-import type { Language, LanguageOption } from '~/types/benchmark.types';
+import type { Language, LanguageOption } from '~/types/benchmark';
 
 interface LanguageSelectorProps {
   languages: LanguageOption[];

@@ -7,8 +7,11 @@ interface SystemViewProps {
 }
 
 export function SystemView({ jobData }: SystemViewProps) {
+  // Handle double-nested result structure
+  const result = jobData.result?.result || jobData.result;
+
   // Get the first vmstat snapshot (most recent)
-  const vmstat = jobData.result?.vmstat?.[0];
+  const vmstat = result?.vmstat?.[0];
 
   if (!vmstat) {
     return (
