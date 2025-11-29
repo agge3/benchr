@@ -117,7 +117,7 @@ async def pubsub_listener():
 
                 # Wrap in a proper message format
                 ws_message = {
-                    'type': 'job_result',
+                    'type': 'job_complete',
                     'job_id': job_id,
                     'data': job_result
                 }
