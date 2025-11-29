@@ -1,7 +1,5 @@
 # Benchr
-### Benchmark your code. Compete with the world.
-
-<image of website here>
+### Benchmark your code. Compare two languages. See the difference.
 
 ---
 
@@ -10,7 +8,7 @@
 Benchr is a real-time code benchmarking platform that lets you write, execute, and analyze code performance across multiple
 languages. Submit your code and get detailed metrics including CPU cycles, instructions per cycle (IPC), cache behavior, branch
 predictions, memory usage, and execution time—all running in isolated Firecracker microVMs for security and consistency. Whether
-you're optimizing algorithms, comparing implementations, or competing on leaderboards, Benchr gives you the low-level insights
+you're optimizing algorithms or comparing implementations, Benchr gives you the low-level insights
 you need.
 
 ### Project Structure
