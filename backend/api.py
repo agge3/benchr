@@ -89,10 +89,10 @@ async def shutdown():
 
 async def pubsub_listener():
     """Listen for job completion notifications and broadcast to websocket clients"""
-    print("[Quart] Starting pubsub listener...")
+    print("[Quart] Starting pubsub listener...", flush=True)
 
     async def message_handler(message):
-        print(f"[Quart] Received message: {message}")
+        print(f"[Quart] Received message: {message}", flush=True)
 
         try:
             raw = message["data"]
@@ -102,21 +102,40 @@ async def pubsub_listener():
             data = json.loads(raw)
             job_id = str(data.get("job_id"))
 
-            print(f"[Quart] Broadcasting job result for job_id={job_id}")
+            print(f"[Quart] Broadcasting job result for job_id={job_id}", flush=True)
 
             if job_id in ws_clients:
-                job_result = data.get("job_result")
-                print(f"[Quart] Found {len(ws_clients[job_id])} subscribers for job {job_id}")
+                print(f"[Quart] Found {len(ws_clients[job_id])} subscribers for job {job_id}", flush=True)
+
+                # Fetch job result from cache/database
+                job_result = await cache.get(int(job_id))
+                print(f"[Quart] Fetched job result: {job_result}", flush=True)
+
+                if job_result is None:
+                    print(f"[Quart] WARNING: No job result found for job_id={job_id}", flush=True)
+                    job_result = {'error': 'Job result not found', 'job_id': job_id}
+
+                # Wrap in a proper message format
+                ws_message = {
+                    'type': 'job_result',
+                    'job_id': job_id,
+                    'data': job_result
+                }
 
                 # Broadcast to all subscribers
                 for client_queue in ws_clients[job_id]:
-                    await client_queue.put(job_result)
+                    await client_queue.put(ws_message)
 
                 # Remove subscribers after sending result
                 del ws_clients[job_id]
+                print(f"[Quart] Broadcast complete, removed subscribers for job {job_id}", flush=True)
+            else:
+                print(f"[Quart] No subscribers for job {job_id}", flush=True)
 
         except Exception as e:
-            print(f"[Quart] Error processing message: {e}")
+            print(f"[Quart] Error processing message: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
 
     try:
         # Dedicated connection for pubsub
