@@ -145,7 +145,14 @@ async def pubsub_listener():
 @app.websocket('/ws')
 async def ws():
     """WebSocket endpoint for real-time job updates"""
-    await websocket.accept()
+    print("[WS] New connection attempt", flush=True)
+
+    try:
+        await websocket.accept()
+        print("[WS] Connection accepted", flush=True)
+    except Exception as e:
+        print(f"[WS] Failed to accept connection: {e}", flush=True)
+        return
 
     client_queue = asyncio.Queue()
     subscribed_jobs = set()
@@ -153,47 +160,93 @@ async def ws():
     try:
         # Handle incoming messages and outgoing notifications concurrently
         async def receive():
+            print("[WS] Receive task started", flush=True)
             while True:
-                data = await websocket.receive_json()
+                try:
+                    data = await websocket.receive_json()
+                    print(f"[WS] Received message: {data}", flush=True)
 
-                if data.get('type') == 'subscribe':
-                    job_id = str(data.get('job_id'))
-                    if job_id:
-                        if job_id not in ws_clients:
-                            ws_clients[job_id] = set()
-                        ws_clients[job_id].add(client_queue)
-                        subscribed_jobs.add(job_id)
-                        await websocket.send_json({'type': 'subscribed', 'job_id':
-job_id})
-                        print(f"[WS] Client subscribed to job {job_id}")
+                    if data.get('type') == 'subscribe':
+                        job_id = str(data.get('job_id'))
+                        print(f"[WS] Subscribe request for job_id={job_id}", flush=True)
+                        if job_id:
+                            if job_id not in ws_clients:
+                                ws_clients[job_id] = set()
+                            ws_clients[job_id].add(client_queue)
+                            subscribed_jobs.add(job_id)
+                            await websocket.send_json({'type': 'subscribed', 'job_id': job_id})
+                            print(f"[WS] Client subscribed to job {job_id}, total subscribers: {len(ws_clients[job_id])}", flush=True)
+                        else:
+                            print("[WS] Subscribe request missing job_id", flush=True)
 
-                elif data.get('type') == 'unsubscribe':
-                    job_id = str(data.get('job_id'))
-                    if job_id in subscribed_jobs:
-                        subscribed_jobs.discard(job_id)
-                        if job_id in ws_clients:
-                            ws_clients[job_id].discard(client_queue)
+                    elif data.get('type') == 'unsubscribe':
+                        job_id = str(data.get('job_id'))
+                        print(f"[WS] Unsubscribe request for job_id={job_id}", flush=True)
+                        if job_id in subscribed_jobs:
+                            subscribed_jobs.discard(job_id)
+                            if job_id in ws_clients:
+                                ws_clients[job_id].discard(client_queue)
+                            print(f"[WS] Client unsubscribed from job {job_id}", flush=True)
+
+                    else:
+                        print(f"[WS] Unknown message type: {data.get('type')}", flush=True)
+
+                except json.JSONDecodeError as e:
+                    print(f"[WS] Invalid JSON received: {e}", flush=True)
+                except Exception as e:
+                    print(f"[WS] Error in receive loop: {e}", flush=True)
+                    raise
 
         async def send():
+            print("[WS] Send task started", flush=True)
             while True:
-                msg = await client_queue.get()
-                await websocket.send_json(msg)
+                try:
+                    msg = await client_queue.get()
+                    print(f"[WS] Sending message to client: {msg}", flush=True)
+                    await websocket.send_json(msg)
+                    print("[WS] Message sent successfully", flush=True)
+                except Exception as e:
+                    print(f"[WS] Error in send loop: {e}", flush=True)
+                    raise
 
         # Run both tasks
+        print("[WS] Starting receive and send tasks", flush=True)
         receive_task = asyncio.create_task(receive())
         send_task = asyncio.create_task(send())
 
-        await asyncio.gather(receive_task, send_task)
+        done, pending = await asyncio.wait(
+            [receive_task, send_task],
+            return_when=asyncio.FIRST_EXCEPTION
+        )
+
+        # Cancel pending tasks
+        for task in pending:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+        # Check for exceptions
+        for task in done:
+            if task.exception():
+                print(f"[WS] Task failed with exception: {task.exception()}", flush=True)
 
     except asyncio.CancelledError:
-        pass
+        print("[WS] Connection cancelled", flush=True)
+    except Exception as e:
+        print(f"[WS] Connection error: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
     finally:
+        print(f"[WS] Cleaning up, subscribed_jobs={subscribed_jobs}", flush=True)
         # Cleanup subscriptions
         for job_id in subscribed_jobs:
             if job_id in ws_clients:
                 ws_clients[job_id].discard(client_queue)
                 if not ws_clients[job_id]:
                     del ws_clients[job_id]
+        print("[WS] Connection closed", flush=True)
 
 
 # =========== REST API ===========
