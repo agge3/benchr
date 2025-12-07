@@ -6,10 +6,13 @@ Currently implemented as a no-op until Redis caching is fully set up.
 All operations fall through to the database directly via models.
 """
 
-from models import db, Job, JobMetrics
-from typing import Optional
 import datetime
+import json
 import logging
+from typing import Optional
+
+import redis.asyncio as aioredis
+from models import Job, JobMetrics, db
 
 logger = logging.getLogger(__name__)
 
@@ -31,11 +34,22 @@ class JobCache:
         """
         self.redis_url = redis_url
         self._connected = False
+        self.redis: Optional[aioredis.Redis] = None
 
     async def connect(self) -> None:
-        """Connect to cache backend (no-op for now)."""
+        """Connect to cache backend."""
         if not self._connected:
             db.connect(reuse_if_open=True)
+
+            if self.redis_url:
+                try:
+                    self.redis = await aioredis.from_url(
+                        self.redis_url, decode_responses=True
+                    )
+                    logger.info(f"[JobCache] Connected to Redis: {self.redis_url}")
+                except Exception as e:
+                    logger.error(f"[JobCache] Failed to connect to Redis: {e}")
+
             self._connected = True
             logger.info("[JobCache] Connected (database passthrough mode)")
 
@@ -43,6 +57,10 @@ class JobCache:
         """Disconnect from cache backend."""
         if self._connected and not db.is_closed():
             db.close()
+
+        if self.redis:
+            await self.redis.close()
+
         self._connected = False
         logger.info("[JobCache] Disconnected")
 
@@ -59,13 +77,13 @@ class JobCache:
         try:
             job = Job.get_by_id(job_id)
             return {
-                'id': job.id,
-                'code': job.code,
-                'lang': job.lang,
-                'compiler': job.compiler,
-                'opts': job.opts,
-                'status': job.status,
-                'result': job.get_result()
+                "id": job.id,
+                "code": job.code,
+                "lang": job.lang,
+                "compiler": job.compiler,
+                "opts": job.opts,
+                "status": job.status,
+                "result": job.get_result(),
             }
         except Exception as e:
             logger.warning(f"[JobCache] Failed to get job {job_id}: {e}")
@@ -84,14 +102,14 @@ class JobCache:
         """
         try:
             job = Job.get_by_id(job_id)
-            job_result = result.get('result', {})
+            job_result = result.get("result", {})
             job.set_result(job_result)
-            job.status = result.get('status', 'completed')
+            job.status = result.get("status", "completed")
             job.completed_at = datetime.datetime.now()
             job.save()
 
             # Save metrics if successful
-            if job_result.get('success'):
+            if job_result.get("success"):
                 self._save_metrics(job, job_result)
 
             return True
@@ -102,21 +120,21 @@ class JobCache:
     def _save_metrics(self, job: Job, result: dict) -> None:
         """Save job metrics to database."""
         try:
-            perf = result.get('perf', {})
-            time_data = result.get('time', {})
+            perf = result.get("perf", {})
+            time_data = result.get("time", {})
 
-            cycles = perf.get('cycles')
-            instructions = perf.get('instructions')
+            cycles = perf.get("cycles")
+            instructions = perf.get("instructions")
             ipc = instructions / cycles if cycles and cycles > 0 else None
 
-            exec_time = time_data.get('elapsed_time_seconds')
+            exec_time = time_data.get("elapsed_time_seconds")
 
             JobMetrics.create(
                 job=job,
                 cycles=cycles,
                 instructions=instructions,
                 ipc=ipc,
-                execution_time_ms=exec_time * 1000 if exec_time else None
+                execution_time_ms=exec_time * 1000 if exec_time else None,
             )
         except Exception as e:
             logger.warning(f"[JobCache] Failed to save metrics for job {job.id}: {e}")
@@ -135,9 +153,36 @@ class JobCache:
         Note: This is a no-op until Redis caching is set up.
               Returns None to indicate the feature is not yet available.
         """
-        # TODO: Implement Redis-based saved benchmarks
-        logger.info(f"[JobCache] save_benchmark called (no-op) - job_id={job_id}, name={name}")
-        return None
+        if not self.redis:
+            logger.warning("[JobCache] Redis not configured, cannot save benchmark")
+            return None
+
+        try:
+            # Get job data
+            job_data = await self.get(job_id)
+            if not job_data:
+                logger.warning(
+                    f"[JobCache] Job {job_id} not found, cannot save benchmark"
+                )
+                return None
+
+            # Add name and timestamp
+            job_data["name"] = name
+            job_data["saved_at"] = datetime.datetime.now().isoformat()
+
+            # Generate ID
+            benchmark_id = await self.redis.incr("benchmarks:count")
+
+            # Save to Redis
+            key = f"benchmark:{benchmark_id}"
+            await self.redis.set(key, json.dumps(job_data))
+
+            logger.info(f"[JobCache] Saved benchmark {benchmark_id} for job {job_id}")
+            return benchmark_id
+
+        except Exception as e:
+            logger.error(f"[JobCache] Failed to save benchmark: {e}")
+            return None
 
     async def get_saved(self, benchmark_id: int) -> Optional[dict]:
         """
@@ -148,12 +193,19 @@ class JobCache:
 
         Returns:
             Benchmark data dict or None if not found
-
-        Note: This is a no-op until Redis caching is set up.
         """
-        # TODO: Implement Redis-based saved benchmarks
-        logger.info(f"[JobCache] get_saved called (no-op) - benchmark_id={benchmark_id}")
-        return None
+        if not self.redis:
+            return None
+
+        try:
+            key = f"benchmark:{benchmark_id}"
+            data = await self.redis.get(key)
+            if data:
+                return json.loads(data)
+            return None
+        except Exception as e:
+            logger.error(f"[JobCache] Failed to get saved benchmark: {e}")
+            return None
 
     async def delete_saved(self, benchmark_id: int) -> bool:
         """
@@ -164,9 +216,14 @@ class JobCache:
 
         Returns:
             True if deleted successfully
-
-        Note: This is a no-op until Redis caching is set up.
         """
-        # TODO: Implement Redis-based saved benchmarks
-        logger.info(f"[JobCache] delete_saved called (no-op) - benchmark_id={benchmark_id}")
-        return False
+        if not self.redis:
+            return False
+
+        try:
+            key = f"benchmark:{benchmark_id}"
+            result = await self.redis.delete(key)
+            return result > 0
+        except Exception as e:
+            logger.error(f"[JobCache] Failed to delete saved benchmark: {e}")
+            return False

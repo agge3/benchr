@@ -84,8 +84,8 @@ jobs:
             node-modules-${{ runner. os }}-
 
       - name: Install dependencies
-        if: steps. cache-node-modules.outputs. cache-hit != 'true'
-        run: npm ci --prefer-offline --no-audit
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: npm install --prefer-offline --no-audit
 
   frontend-typecheck:
     name: TypeScript Check
