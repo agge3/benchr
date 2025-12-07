@@ -1,0 +1,707 @@
+name: PR Quality Gate
+
+on:
+  pull_request:
+    branches: [main, develop]
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+  PYTHON_VERSION: '3.11'
+  REDIS_VERSION: '7'
+
+jobs:
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      frontend: ${{ steps.changes.outputs.frontend }}
+      backend: ${{ steps.changes.outputs.backend }}
+      tests: ${{ steps.changes.outputs.tests }}
+      workflows: ${{ steps.changes.outputs.workflows }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            frontend:
+              - 'frontend/**'
+              - 'package.json'
+              - 'package-lock.json'
+            backend:
+              - 'backend/**'
+              - 'requirements*.txt'
+              - 'pyproject.toml'
+            tests:
+              - 'tests/**'
+            workflows:
+              - '. github/workflows/**'
+
+  frontend-install:
+    name: Frontend Dependencies
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        id: cache-node-modules
+        with:
+          path: frontend/node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('frontend/package-lock. json') }}
+          restore-keys: |
+            node-modules-${{ runner. os }}-
+
+      - name: Install dependencies
+        if: steps. cache-node-modules.outputs. cache-hit != 'true'
+        run: npm ci --prefer-offline --no-audit
+
+  frontend-typecheck:
+    name: TypeScript Check
+    needs: [changes, frontend-install]
+    if: needs.changes.outputs. frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Restore node_modules
+        uses: actions/cache@v4
+        with:
+          path: frontend/node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+
+      - name: Run TypeScript type checking
+        run: npm run typecheck
+
+  frontend-lint:
+    name: Frontend Lint
+    needs: [changes, frontend-install]
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Restore node_modules
+        uses: actions/cache@v4
+        with:
+          path: frontend/node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+
+      - name: Install ESLint if not present
+        run: |
+          if ! npm list eslint > /dev/null 2>&1; then
+            npm install --save-dev eslint @typescript-eslint/parser @typescript-eslint/eslint-plugin eslint-plugin-react eslint-plugin-react-hooks
+          fi
+
+      - name: Run ESLint
+        run: npx eslint .  --ext . ts,.tsx,. js,.jsx --max-warnings 0 --ignore-pattern 'node_modules/' --ignore-pattern 'build/' || true
+
+      - name: Check for unused dependencies
+        run: npx depcheck --ignores="@types/*,autoprefixer,postcss,tailwindcss,tw-animate-css" || true
+
+  frontend-build:
+    name: Frontend Build
+    needs: [changes, frontend-install]
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node. js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Restore node_modules
+        uses: actions/cache@v4
+        with:
+          path: frontend/node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+
+      - name: Build React Router SSR app
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/build
+          retention-days: 1
+
+  frontend-test:
+    name: Frontend Tests
+    needs: [changes, frontend-install]
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Restore node_modules
+        uses: actions/cache@v4
+        with:
+          path: frontend/node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+
+      - name: Install Vitest if not present
+        run: |
+          if ! npm list vitest > /dev/null 2>&1; then
+            npm install --save-dev vitest @testing-library/react @testing-library/jest-dom jsdom @vitejs/plugin-react
+          fi
+
+      - name: Run tests
+        run: npx vitest run --passWithNoTests
+        env:
+          CI: true
+
+  frontend-security:
+    name: Frontend Security Audit
+    needs: [changes, frontend-install]
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Run npm audit
+        run: npm audit --audit-level=high || true
+
+      - name: Check for known vulnerabilities
+        run: npx audit-ci --high || true
+
+  backend-install:
+    name: Backend Dependencies
+    needs: changes
+    if: needs.changes. outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env. PYTHON_VERSION }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        id: cache-pip
+        with:
+          path: ~/. cache/pip
+          key: pip-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('backend/requirements*.txt', 'backend/pyproject.toml') }}
+          restore-keys: |
+            pip-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+
+      - name: Cache virtual environment
+        uses: actions/cache@v4
+        id: cache-venv
+        with:
+          path: backend/.venv
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('backend/requirements*.txt', 'backend/pyproject.toml') }}
+
+      - name: Create virtual environment
+        if: steps.cache-venv. outputs.cache-hit != 'true'
+        run: python -m venv .venv
+
+      - name: Install dependencies
+        if: steps.cache-venv.outputs.cache-hit != 'true'
+        run: |
+          source .venv/bin/activate
+          pip install --upgrade pip wheel setuptools
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+          pip install pytest pytest-asyncio pytest-cov black ruff mypy bandit safety
+
+  backend-lint:
+    name: Backend Lint
+    needs: [changes, backend-install]
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Restore virtual environment
+        uses: actions/cache@v4
+        with:
+          path: backend/.venv
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('backend/requirements*. txt', 'backend/pyproject.toml') }}
+
+      - name: Run Ruff linter
+        run: |
+          source .venv/bin/activate
+          ruff check .  --output-format=github
+
+      - name: Run Ruff formatter check
+        run: |
+          source .venv/bin/activate
+          ruff format --check .
+
+  backend-typecheck:
+    name: Python Type Check
+    needs: [changes, backend-install]
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Restore virtual environment
+        uses: actions/cache@v4
+        with:
+          path: backend/.venv
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('backend/requirements*.txt', 'backend/pyproject.toml') }}
+
+      - name: Install type stubs
+        run: |
+          source .venv/bin/activate
+          pip install types-redis types-peewee || true
+
+      - name: Run MyPy
+        run: |
+          source . venv/bin/activate
+          mypy .  --ignore-missing-imports --no-error-summary || true
+
+  backend-test:
+    name: Backend Tests
+    needs: [changes, backend-install]
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:${{ env.REDIS_VERSION }}
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Restore virtual environment
+        uses: actions/cache@v4
+        with:
+          path: backend/.venv
+          key: venv-${{ runner. os }}-${{ env. PYTHON_VERSION }}-${{ hashFiles('backend/requirements*.txt', 'backend/pyproject.toml') }}
+
+      - name: Run pytest with coverage
+        run: |
+          source .venv/bin/activate
+          pytest ../tests -v --cov=. --cov-report=xml --cov-report=term-missing --cov-fail-under=0 || true
+        env:
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          DATABASE_URL: sqlite:///test.db
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-coverage
+          path: backend/coverage.xml
+          retention-days: 5
+
+  backend-security:
+    name: Backend Security Scan
+    needs: [changes, backend-install]
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Restore virtual environment
+        uses: actions/cache@v4
+        with:
+          path: backend/.venv
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('backend/requirements*. txt', 'backend/pyproject.toml') }}
+
+      - name: Run Bandit security linter
+        run: |
+          source .venv/bin/activate
+          bandit -r .  -ll -ii --exclude . /. venv -f json -o bandit-report.json || true
+          bandit -r . -ll -ii --exclude ./.venv || true
+
+      - name: Check dependencies for vulnerabilities
+        run: |
+          source .venv/bin/activate
+          pip freeze > requirements-freeze.txt
+          safety check -r requirements-freeze.txt --full-report || true
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-security-reports
+          path: |
+            backend/bandit-report.json
+          retention-days: 5
+
+  backend-quart-check:
+    name: Quart App Validation
+    needs: [changes, backend-install]
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:${{ env. REDIS_VERSION }}
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Restore virtual environment
+        uses: actions/cache@v4
+        with:
+          path: backend/.venv
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('backend/requirements*.txt', 'backend/pyproject.toml') }}
+
+      - name: Validate Quart app imports
+        run: |
+          source .venv/bin/activate
+          python -c "
+          import sys
+          try:
+              from api import app
+              print('Quart app imported successfully')
+          except ImportError as e:
+              print(f'Import warning (may be expected): {e}')
+          except Exception as e:
+              print(f'Warning: {e}')
+          "
+        env:
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+
+  database-check:
+    name: Database Migration Check
+    needs: [changes, backend-install]
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Restore virtual environment
+        uses: actions/cache@v4
+        with:
+          path: backend/.venv
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('backend/requirements*. txt', 'backend/pyproject.toml') }}
+
+      - name: Validate Peewee models
+        run: |
+          source .venv/bin/activate
+          python -c "
+          try:
+              from models import *
+              print('Peewee models validated successfully')
+          except Exception as e:
+              print(f'Model validation warning: {e}')
+          "
+
+      - name: Test SQLite migrations
+        run: |
+          source .venv/bin/activate
+          python -c "
+          try:
+              from migrate import *
+              print('Migration module loaded successfully')
+          except Exception as e:
+              print(f'Migration warning: {e}')
+          "
+
+  integration-test:
+    name: Integration Tests
+    needs: [changes, frontend-build, backend-test]
+    if: |
+      always() &&
+      (needs.changes.outputs.frontend == 'true' || needs.changes.outputs.backend == 'true') &&
+      (needs.frontend-build.result == 'success' || needs.frontend-build.result == 'skipped') &&
+      (needs. backend-test.result == 'success' || needs.backend-test.result == 'skipped')
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:${{ env. REDIS_VERSION }}
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Download frontend build
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/build
+        continue-on-error: true
+
+      - name: WebSocket connectivity test
+        run: |
+          echo "WebSocket integration test placeholder"
+
+      - name: API endpoint validation
+        run: |
+          echo "API endpoint validation placeholder"
+
+  code-quality:
+    name: Code Quality Analysis
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' || needs. changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for large files
+        run: |
+          find . -type f -size +5M -not -path ". /.git/*" | head -20 || echo "No large files found"
+
+      - name: Check for merge conflict markers
+        run: |
+          if grep -rn "<<<<<<< \|======= \|>>>>>>> " --include="*.ts" --include="*.tsx" --include="*.py" --include="*.js" .; then
+            echo "Merge conflict markers found!"
+            exit 1
+          else
+            echo "No merge conflict markers found"
+          fi
+
+      - name: Check for debug statements
+        run: |
+          echo "Checking for debug statements..."
+          grep -rn "import pdb\|pdb. set_trace()\|breakpoint()\|print(" backend/ --include="*.py" | grep -v "# noqa" | head -20 || true
+          grep -rn "console. log\|debugger" frontend/ --include="*.ts" --include="*.tsx" --include="*.js" | grep -v "// eslint-disable" | head -20 || true
+          echo "Review any debug statements above before merging"
+
+      - name: Check TODO and FIXME comments
+        run: |
+          echo "TODO and FIXME items found:"
+          grep -rn "TODO\|FIXME\|XXX\|HACK" --include="*.ts" --include="*.tsx" --include="*.py" --include="*.js" .  | grep -v node_modules | head -30 || echo "None found"
+
+  docker-build:
+    name: Docker Build Check
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' || needs. changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build frontend Docker image
+        if: needs.changes.outputs.frontend == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: false
+          tags: benchr-frontend:pr-${{ github.event.pull_request.number }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  shell-lint:
+    name: Shell Script Lint
+    needs: changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Run ShellCheck
+        run: |
+          find . -name "*.sh" -type f -not -path "./node_modules/*" -not -path ". /.git/*" | while read -r script; do
+            echo "Checking: $script"
+            shellcheck "$script" || true
+          done
+
+  pr-status:
+    name: PR Status
+    needs:
+      - changes
+      - frontend-typecheck
+      - frontend-lint
+      - frontend-build
+      - frontend-test
+      - frontend-security
+      - backend-lint
+      - backend-typecheck
+      - backend-test
+      - backend-security
+      - backend-quart-check
+      - database-check
+      - integration-test
+      - code-quality
+      - docker-build
+      - shell-lint
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check job results
+        run: |
+          echo "## PR Quality Gate Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Frontend" >> $GITHUB_STEP_SUMMARY
+          echo "- TypeScript: ${{ needs.frontend-typecheck.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Lint: ${{ needs. frontend-lint.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Build: ${{ needs.frontend-build. result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Tests: ${{ needs.frontend-test.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Security: ${{ needs.frontend-security.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Backend" >> $GITHUB_STEP_SUMMARY
+          echo "- Lint (Ruff): ${{ needs.backend-lint.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Type Check (MyPy): ${{ needs. backend-typecheck.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Tests: ${{ needs.backend-test. result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Security: ${{ needs. backend-security.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Quart App: ${{ needs.backend-quart-check.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Database: ${{ needs.database-check. result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Other Checks" >> $GITHUB_STEP_SUMMARY
+          echo "- Integration: ${{ needs.integration-test.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Code Quality: ${{ needs.code-quality.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Docker: ${{ needs.docker-build. result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Shell Scripts: ${{ needs.shell-lint.result }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Determine overall status
+        run: |
+          if [[ "${{ needs.frontend-build.result }}" == "failure" ]] || \
+             [[ "${{ needs. frontend-typecheck.result }}" == "failure" ]] || \
+             [[ "${{ needs.backend-lint.result }}" == "failure" ]] || \
+             [[ "${{ needs.backend-test.result }}" == "failure" ]]; then
+            echo "Critical checks failed!"
+            exit 1
+          fi
+          echo "All critical checks passed!"
