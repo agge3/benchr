@@ -7,7 +7,12 @@ on:
       - "neoStella"
   pull_request:
     branches:
-      [main, development, remotes/origin/version_1.0, remotes/origin/version_1.1]
+      [
+        main,
+        development,
+        remotes/origin/version_1.0,
+        remotes/origin/version_1.1,
+      ]
     types: [opened, synchronize, reopened]
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -354,7 +359,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       redis:
-        image: redis:${{ env.REDIS_VERSION }}
+        image: redis:7
         ports:
           - 6379:6379
         options: >-
@@ -446,7 +451,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       redis:
-        image: redis:${{ env. REDIS_VERSION }}
+        image: redis:7
         ports:
           - 6379:6379
         options: >-
@@ -543,7 +548,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       redis:
-        image: redis:${{ env. REDIS_VERSION }}
+        image: redis:7
         ports:
           - 6379:6379
         options: >-
