@@ -45,14 +45,16 @@ jobs:
               - 'frontend/**'
               - 'package.json'
               - 'package-lock.json'
+              - '.github/workflows/**'
             backend:
               - 'backend/**'
               - 'requirements*.txt'
               - 'pyproject.toml'
+              - '.github/workflows/**'
             tests:
               - 'tests/**'
             workflows:
-              - '. github/workflows/**'
+              - '.github/workflows/**'
 
   frontend-install:
     name: Frontend Dependencies
