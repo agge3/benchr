@@ -159,7 +159,7 @@ async def pubsub_listener():
     finally:
         print("[Quart] Pubsub listener cleanup complete")
 
-# =========== WebSocket ===========
+# WebSocket 
 
 @app.websocket('/ws')
 async def ws():
@@ -268,7 +268,7 @@ async def ws():
         print("[WS] Connection closed", flush=True)
 
 
-# =========== REST API ===========
+#   REST API  
 
 @app.route('/api/submit', methods=['POST'])
 async def submit_job():
@@ -403,7 +403,7 @@ async def health():
     })
 
 
-# =========== Saved Benchmarks ===========
+#   Saved Benchmarks  
 
 @app.route('/api/saved', methods=['POST'])
 async def save_benchmark():

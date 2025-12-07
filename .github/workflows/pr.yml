@@ -79,7 +79,7 @@ jobs:
         id: cache-node-modules
         with:
           path: frontend/node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('frontend/package-lock. json') }}
+          key: node-modules-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
           restore-keys: |
             node-modules-${{ runner. os }}-
 
@@ -351,7 +351,7 @@ jobs:
 
       - name: Run MyPy
         run: |
-          source . venv/bin/activate
+          source .venv/bin/activate
           mypy .  --ignore-missing-imports --no-error-summary || true
 
   backend-test:

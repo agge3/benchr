@@ -1,7 +1,7 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 import queue
 import redis
-import os
+from dotenv import load_dotenv
 
 class IQueue:
     def __init__(self, maxsize, env):
@@ -91,8 +91,8 @@ class RedisQueue(IQueue):
             # test connection
             self.redis.ping()
             print(f"REDIS: connected to redis: {self.redis_url}")
-        except redis.ConnectionError as e:
-            print(f"REDIS: ERROR: cannot connect to redis")
+        except redis.ConnectionError:
+            print("REDIS: ERROR: cannot connect to redis")
             raise
         except Exception as e:
             print(f"REDIS: ERROR: {e}")

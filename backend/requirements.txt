@@ -1,0 +1,5 @@
+quart
+quart-cors
+peewee
+redis
+python-dotenv
