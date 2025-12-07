@@ -63,7 +63,7 @@ class RateLimitedQueue(IQueue):
         pipe.expire(self.rate_key, self.window_seconds + 60)
         await pipe.execute()
 
-    # =========== IQueue interface implementation ===========
+    #    IQueue interface implementation   
 
     async def full(self):
         return await self.size() >= self.max_queue_size
@@ -120,7 +120,7 @@ class RateLimitedQueue(IQueue):
         processing = await self.redis.llen(self.processing_key)
         return queued + processing
 
-    # =========== Additional async methods ===========
+    #    Additional async methods   
 
     async def poll(self, timeout: float = 5.0):
         """Wait for queue notification (event-driven)"""

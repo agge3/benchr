@@ -77,7 +77,7 @@ jobs:
         id: cache-node-modules
         with:
           path: frontend/node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+          key: node-modules-${{ runner.os }}-${{ hashFiles('frontend/package.json') }}
           restore-keys: |
             node-modules-${{ runner.os }}-
 
@@ -105,7 +105,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: frontend/node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+          key: node-modules-${{ runner.os }}-${{ hashFiles('frontend/package.json') }}
 
       - name: Run TypeScript type checking
         run: npm run typecheck
@@ -130,7 +130,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: frontend/node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+          key: node-modules-${{ runner.os }}-${{ hashFiles('frontend/package.json') }}
 
       - name: Install ESLint if not present
         run: |
@@ -164,7 +164,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: frontend/node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+          key: node-modules-${{ runner.os }}-${{ hashFiles('frontend/package.json') }}
 
       - name: Build React Router SSR app
         run: npm run build
@@ -198,7 +198,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: frontend/node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+          key: node-modules-${{ runner.os }}-${{ hashFiles('frontend/package.json') }}
 
       - name: Install Vitest if not present
         run: |
