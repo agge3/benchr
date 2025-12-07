@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Callable, Optional, Dict, Set
+from typing import Optional, Dict, Set
 import redis.asyncio as aioredis
 import json
 import asyncio

@@ -470,7 +470,6 @@ async def chat():
             return jsonify({'error': 'Message is required'}), 400
 
         message = data['message']
-        result = data.get('result')
 
         # TODO: Implement Claude AI integration
         response_text = f"Received message: {message}"
@@ -480,7 +479,9 @@ async def chat():
         return jsonify({'response': response_text})
 
     except Exception as e:
-        print(f"Error in chat endpoint: {e}", exc_info=True)
+        print(f"Error in chat endpoint: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 

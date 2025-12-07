@@ -10,7 +10,6 @@ from job_cache import JobCache
 from IPubSub import get_pubsub
 import env
 from dotenv import load_dotenv
-import json
 import shutil
 
 load_dotenv()

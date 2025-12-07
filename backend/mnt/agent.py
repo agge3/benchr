@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 import socket
-import struct
 import json
 import subprocess
 import tempfile
 import os
 import shutil
-import env
-from util import Container, FirecrackerCfg, send_sock, rec_sock, run_cmd, \
-ISerializer, JsonSerializer
+from util import send_sock, rec_sock, JsonSerializer
 
 EXECUTE_SCRIPT = "/mnt/deploy/execute.sh"
 CFG = "vm_config.json"
@@ -72,14 +69,14 @@ def execute_job(job_data: dict) -> dict:
                 'stderr': proc.stderr,
                 'exit_code': proc.returncode
             }
-            print(f"[Agent] Execution failed: no result file")
+            print("[Agent] Execution failed: no result file")
         
     except subprocess.TimeoutExpired:
         result = {
             'success': False,
             'error': 'Execution timeout (30s)'
         }
-        print(f"[Agent] Execution timeout")
+        print("[Agent] Execution timeout")
     except Exception as e:
         result = {
             'success': False,
@@ -89,7 +86,7 @@ def execute_job(job_data: dict) -> dict:
     finally:
         try:
             shutil.rmtree(tmpdir)
-        except:
+        except Exception:
             pass
     
     return result
@@ -133,7 +130,7 @@ def main():
                     # Receive job data: {code, lang, compiler, opts}
                     job_bytes = rec_sock(conn)
                     job_data = SER.deserialize(job_bytes)                    
-                    print(f"[Agent] Received job")
+                    print("[Agent] Received job")
                     
                     # Execute job
                     result = execute_job(job_data)
@@ -142,7 +139,7 @@ def main():
                     result_bytes = SER.serialize(result)
                     send_sock(conn, result_bytes)
                     
-                    print(f"[Agent] Sent result")
+                    print("[Agent] Sent result")
                     
                 except Exception as e:
                     print(f"[Agent] Error processing job: {e}")
@@ -152,7 +149,7 @@ def main():
                     }
                     try:
                         send_sock(conn, SER.serialize(error_result))
-                    except:
+                    except Exception:
                         break
                     
         except KeyboardInterrupt:
@@ -167,7 +164,7 @@ def main():
             if conn:
                 try:
                     conn.close()
-                except:
+                except Exception:
                     pass
     
     sock.close()
