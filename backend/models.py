@@ -1,5 +1,7 @@
-from peewee import *
-import datetime
+from peewee import (
+    SqliteDatabase, Model, AutoField, TextField, CharField, DateTimeField,
+    ForeignKeyField, BigIntegerField, FloatField, IntegerField
+)
 import json
 from typing import Optional
 import os

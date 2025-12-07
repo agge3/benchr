@@ -81,7 +81,7 @@ jobs:
           path: frontend/node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
           restore-keys: |
-            node-modules-${{ runner. os }}-
+            node-modules-${{ runner.os }}-
 
       - name: Install dependencies
         if: steps.cache-node-modules.outputs.cache-hit != 'true'
@@ -90,7 +90,7 @@ jobs:
   frontend-typecheck:
     name: TypeScript Check
     needs: [changes, frontend-install]
-    if: needs.changes.outputs. frontend == 'true'
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -384,7 +384,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: backend/.venv
-          key: venv-${{ runner. os }}-${{ env. PYTHON_VERSION }}-${{ hashFiles('backend/requirements*.txt', 'backend/pyproject.toml') }}
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('backend/requirements*.txt', 'backend/pyproject.toml') }}
 
       - name: Run pytest with coverage
         run: |
