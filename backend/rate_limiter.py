@@ -4,14 +4,21 @@ import redis.asyncio as aioredis
 from typing import Optional
 import time
 
+
 class RateLimitedQueue(IQueue):
     """
     Async Redis queue with sliding window rate limiting.
     Extends IQueue interface.
     """
 
-    def __init__(self, redis_url: str, queue_name: str,
-                 max_requests: int, window_seconds: int, max_queue_size: int):
+    def __init__(
+        self,
+        redis_url: str,
+        queue_name: str,
+        max_requests: int,
+        window_seconds: int,
+        max_queue_size: int,
+    ):
         # Note: intentionally not calling super().__init__()
         # IQueue's init has different signature and uses sync redis
         self.redis_url = redis_url
@@ -29,10 +36,7 @@ class RateLimitedQueue(IQueue):
         self._pubsub = None
 
     async def connect(self):
-        self.redis = await aioredis.from_url(
-            self.redis_url,
-            decode_responses=True
-        )
+        self.redis = await aioredis.from_url(self.redis_url, decode_responses=True)
         self._pubsub = self.redis.pubsub()
         await self._pubsub.subscribe(self.notify_channel)
         print(f"[RateLimitedQueue] Connected to {self.redis_url}")
@@ -63,7 +67,7 @@ class RateLimitedQueue(IQueue):
         pipe.expire(self.rate_key, self.window_seconds + 60)
         await pipe.execute()
 
-    #    IQueue interface implementation   
+    #    IQueue interface implementation
 
     async def full(self):
         return await self.size() >= self.max_queue_size
@@ -93,9 +97,7 @@ class RateLimitedQueue(IQueue):
         """Atomically move job from queued to processing"""
         try:
             result = await self.redis.brpoplpush(
-                self.queued_key,
-                self.processing_key,
-                timeout=int(timeout)
+                self.queued_key, self.processing_key, timeout=int(timeout)
             )
             if result:
                 return int(result)
@@ -120,15 +122,16 @@ class RateLimitedQueue(IQueue):
         processing = await self.redis.llen(self.processing_key)
         return queued + processing
 
-    #    Additional async methods   
+    #    Additional async methods
 
     async def poll(self, timeout: float = 5.0):
         """Wait for queue notification (event-driven)"""
         try:
             msg = await asyncio.wait_for(
-                self._pubsub.get_message(ignore_subscribe_messages=True,
-timeout=timeout),
-                timeout=timeout + 1
+                self._pubsub.get_message(
+                    ignore_subscribe_messages=True, timeout=timeout
+                ),
+                timeout=timeout + 1,
             )
             return msg
         except asyncio.TimeoutError:

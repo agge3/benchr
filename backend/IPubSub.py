@@ -68,7 +68,7 @@ class RedisPubSub(IPubSub):
         await pubsub.publish('job_results', {'job_id': 123})
     """
 
-    _instance: Optional['RedisPubSub'] = None
+    _instance: Optional["RedisPubSub"] = None
     _lock: asyncio.Lock = None
 
     def __init__(self):
@@ -80,7 +80,7 @@ class RedisPubSub(IPubSub):
         self._connected = False
 
     @classmethod
-    async def get_instance(cls, redis_url: str = None) -> 'RedisPubSub':
+    async def get_instance(cls, redis_url: str = None) -> "RedisPubSub":
         """
         Get singleton instance with lazy initialization
 
@@ -107,7 +107,7 @@ class RedisPubSub(IPubSub):
 
         self._redis = await aioredis.from_url(redis_url, decode_responses=True)
         self._pubsub = self._redis.pubsub()
-        await self._pubsub.subscribe('job_results')
+        await self._pubsub.subscribe("job_results")
         self._running = True
         self._connected = True
         self._task = asyncio.create_task(self._listen())
@@ -117,14 +117,14 @@ class RedisPubSub(IPubSub):
         """Background listener task"""
         try:
             async for message in self._pubsub.listen():
-                if message['type'] != 'message':
+                if message["type"] != "message":
                     continue
 
-                channel = message['channel']
+                channel = message["channel"]
                 print(f"[RedisPubSub] Received on {channel}: {message['data']}")
 
                 try:
-                    data = json.loads(message['data'])
+                    data = json.loads(message["data"])
 
                     if channel in self._subscribers:
                         for queue in list(self._subscribers[channel]):

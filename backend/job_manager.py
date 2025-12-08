@@ -18,6 +18,7 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 NUM_VMS = int(os.getenv("NUM_VMS", "1"))
 DEBUG = True
 
+
 @dataclass
 class Firecracker:
     path: str = "firecracker"
@@ -34,6 +35,7 @@ class Firecracker:
         self.rootfs = f"{self.path}/rootfs.ext4"
         self.config = f"{self.path}/config.json"
         self.vm_config = f"{self.path}/vm_config.json"
+
 
 @dataclass
 class Container:
@@ -58,9 +60,7 @@ async def run_cmd(cmd: str):
     """Run shell command asynchronously"""
     try:
         p = await asyncio.create_subprocess_exec(
-            *cmd.split(),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+            *cmd.split(), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
         return p
     except Exception as e:
@@ -73,7 +73,7 @@ class JobManager:
         self._fc = Firecracker()
         self._ctr_run = "/var/run/firecracker"
         self._num_vms = num_vms
-        self._ctrs_q: List[Container] = [] # queue
+        self._ctrs_q: List[Container] = []  # queue
         self._pending: Dict[int, asyncio.Future] = {}
         self.event = asyncio.Event()
         self._serializer = ser or JsonSerializer()
@@ -88,12 +88,11 @@ class JobManager:
         while time.monotonic() - start < timeout:
             try:
                 reader, writer = await asyncio.wait_for(
-                    asyncio.open_unix_connection(ctr.vsock),
-                    timeout=1.0
+                    asyncio.open_unix_connection(ctr.vsock), timeout=1.0
                 )
 
                 # Handshake
-                writer.write(f"CONNECT {ctr.port}\n".encode('ascii'))
+                writer.write(f"CONNECT {ctr.port}\n".encode("ascii"))
                 await writer.drain()
 
                 ack = await asyncio.wait_for(reader.read(64), timeout=2.0)
@@ -101,15 +100,14 @@ class JobManager:
                 writer.close()
                 await writer.wait_closed()
 
-                if ack.decode('ascii').strip().startswith("OK"):
+                if ack.decode("ascii").strip().startswith("OK"):
                     ctr.ready = True
                     self.event.set()
                     if DEBUG:
                         print(f"[JOBMGR] Container {ctr.cid} ready")
                     return True
 
-            except (ConnectionRefusedError, asyncio.TimeoutError,
-FileNotFoundError):
+            except (ConnectionRefusedError, asyncio.TimeoutError, FileNotFoundError):
                 await asyncio.sleep(0.5)
             except Exception as e:
                 print(f"[JOBMGR] Container {ctr.cid} check error: {e}")
@@ -125,9 +123,7 @@ FileNotFoundError):
             if os.path.exists(sock):
                 os.remove(sock)
 
-        cmd = (
-          f"{self._fc.bin} --api-sock {api_sock} --config-file {ctr.config}"
-          )
+        cmd = f"{self._fc.bin} --api-sock {api_sock} --config-file {ctr.config}"
         p = await run_cmd(cmd)
         if p is None:
             raise RuntimeError(f"Failed to start container {ctr.cid}")
@@ -145,16 +141,20 @@ FileNotFoundError):
 
         for ctr, success in zip(self._ctrs_q, results):
             if not success:
-                raise RuntimeError(f"Failed to start container pool: container"
-                  f"{ctr.cid} failed to start")
+                raise RuntimeError(
+                    f"Failed to start container pool: container"
+                    f"{ctr.cid} failed to start"
+                )
 
         print(f"[JOBMGR] Pool started: {len(self._ctrs_q)} VMs ready")
 
     def create_configs(self):
         """Create per-VM configs from templates"""
         try:
-            with open(self._fc.config, 'rb') as f, \
-                    open(self._fc.vm_config, 'rb') as vmf:
+            with (
+                open(self._fc.config, "rb") as f,
+                open(self._fc.vm_config, "rb") as vmf,
+            ):
                 data = self._serializer.deserialize(f.read())
                 vm = self._serializer.deserialize(vmf.read())
         except Exception as e:
@@ -219,8 +219,7 @@ FileNotFoundError):
             data["drives"][env.CONFIG_MNT_INDEX]["path_on_host"] = deploy_dst
 
             try:
-                with open(cfg, 'wb') as f, \
-                        open(vm_cfg, 'wb') as vmf:
+                with open(cfg, "wb") as f, open(vm_cfg, "wb") as vmf:
                     # not human-readable to save disk space
                     ser = self._serializer.serialize(data)
                     vm_ser = self._serializer.serialize(vm)
@@ -231,12 +230,7 @@ FileNotFoundError):
 
             # NOTE: NOT ready until started!
             ctr = Container(
-                cid=cid,
-                config=cfg,
-                vm_config=vm_cfg,
-                log=log,
-                vsock=vsock,
-                port=port
+                cid=cid, config=cfg, vm_config=vm_cfg, log=log, vsock=vsock, port=port
             )
             self._ctrs_q.append(ctr)
 
@@ -250,8 +244,9 @@ FileNotFoundError):
     async def _execute_job(self, ctr: Container, job: Job):
         """Execute job on container, then reset (ephemeral)"""
         if not ctr.ready:
-            raise RuntimeError(f"Attempted container {ctr.cid} execution, but" +
-              "not ready")
+            raise RuntimeError(
+                f"Attempted container {ctr.cid} execution, but" + "not ready"
+            )
 
         ctr.ready = False
 
@@ -265,10 +260,10 @@ FileNotFoundError):
             reader, writer = await asyncio.open_unix_connection(ctr.vsock)
 
             # Send vsock proxy handshake
-            writer.write(f"CONNECT {ctr.port}\n".encode('ascii'))
+            writer.write(f"CONNECT {ctr.port}\n".encode("ascii"))
             await writer.drain()
             ack = await asyncio.wait_for(reader.read(64), timeout=2.0)
-            if not ack.decode('ascii').strip().startswith("OK"):
+            if not ack.decode("ascii").strip().startswith("OK"):
                 raise RuntimeError(f"Vsock handshake failed: {ack}")
 
             # Send length-prefixed message
@@ -300,6 +295,7 @@ FileNotFoundError):
             # xxx how to handle?
             print(f"[JOBMGR] Job {job.id} execution error: {e}")
             import traceback
+
             traceback.print_exc()
 
             if not job.future.done():
@@ -407,7 +403,7 @@ async def main():
         queue_name=os.getenv("RATE_QUEUE_NAME", "benchr"),
         max_requests=int(os.getenv("RATE_MAX_REQUESTS", "100")),
         window_seconds=int(os.getenv("RATE_WINDOW_SEC", "60")),
-        max_queue_size=int(os.getenv("RATE_MAX_QUEUE_SIZE", "1000"))
+        max_queue_size=int(os.getenv("RATE_MAX_QUEUE_SIZE", "1000")),
     )
     await queue.connect()
 
@@ -431,8 +427,7 @@ async def main():
             manager_task = asyncio.create_task(manager.event.wait())
 
             done, pending = await asyncio.wait(
-                [queue_task, manager_task],
-                return_when=asyncio.FIRST_COMPLETED
+                [queue_task, manager_task], return_when=asyncio.FIRST_COMPLETED
             )
 
             # Cancel pending tasks
@@ -466,16 +461,15 @@ async def main():
             for job_id, res in finished:
                 print(f"[MAIN] Job {job_id} finished")
 
-                await cache.update(job_id, {
-                    "status": "completed",
-                    "result": res,
-                    "completed_at": time.time()
-                })
+                await cache.update(
+                    job_id,
+                    {"status": "completed", "result": res, "completed_at": time.time()},
+                )
 
                 await queue.pop(job_id)
 
                 # Notify WebSocket clients via Redis pubsub
-                await pubsub.publish('job_results', {'job_id': job_id})
+                await pubsub.publish("job_results", {"job_id": job_id})
                 print(f"[MAIN] Published completion for job {job_id}")
 
             # 3. Container ready - handled internally via event.set()
@@ -485,6 +479,7 @@ async def main():
     except Exception as e:
         print(f"[MAIN] Error: {e}")
         import traceback
+
         traceback.print_exc()
     finally:
         await manager.shutdown()
