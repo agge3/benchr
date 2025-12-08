@@ -114,6 +114,7 @@ interface CompilationInfo {
 interface ResultMetadata {
 	language: string;
 	interpreter: string;
+	compiler?: string;
 	opts: string | null;
 	source_size_bytes: number;
 }

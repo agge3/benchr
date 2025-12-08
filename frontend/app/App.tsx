@@ -1,9 +1,7 @@
 
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import BenchmarkWorkspace from './pages/BenchmarkWorkspace';
-import Dashboard from './pages/Dashboard';
-import Results from './pages/Results';
+import { BenchmarkWorkspace, Dashboard, Results } from './pages';
 import './App.css';
 
 function App() {
