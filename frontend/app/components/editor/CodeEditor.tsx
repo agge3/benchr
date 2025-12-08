@@ -4,14 +4,15 @@ import { ClientOnly } from '~/components/ui/ClientOnly';
 import { ErrorBoundary } from '~/components/ui/ErrorBoundary';
 import { defineAndSetBenchrTheme, BENCHR_THEME_NAME } from '~/constants/monacoTheme';
 import type { editor } from 'monaco-editor';
+import type { Language } from '~/types/benchmark';
 
 interface CodeEditorProps {
-  value: string;
-  onChange: (value: string) => void;
-  language: 'cpp' | 'c' | 'python' | 'asm';
-  theme?: string;
-  readOnly?: boolean;
-  onSave?: () => void;
+	value: string;
+	onChange: (value: string) => void;
+	language: Language | 'asm';
+	theme?: string;
+	readOnly?: boolean;
+	onSave?: () => void;
 }
 
 export const CodeEditor: React.FC<CodeEditorProps> = ({
@@ -73,7 +74,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 							language={language}
 							value={value}
 							theme={theme}
-							onChange={(val) => onChange(val || '')}
+							onChange={(val: string | undefined) => onChange(val || '')}
 							onMount={handleEditorMount}
 							options={{
 								readOnly,

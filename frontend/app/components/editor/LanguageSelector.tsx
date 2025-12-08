@@ -12,7 +12,7 @@ export function LanguageSelector({ languages, currentLanguage, onLanguageChange 
     <ToggleGroup
       type="single"
       value={currentLanguage}
-      onValueChange={(value) => value && onLanguageChange(value as Language)}
+      onValueChange={(value: string) => value && onLanguageChange(value as Language)}
     >
       {languages.map(({ id, label }) => (
         <ToggleGroupItem
