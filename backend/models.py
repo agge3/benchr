@@ -1,18 +1,20 @@
+import json
+import os
+from datetime import datetime
+from typing import Optional
+
 from peewee import (
-    SqliteDatabase,
-    Model,
     AutoField,
-    TextField,
+    BigIntegerField,
     CharField,
     DateTimeField,
-    ForeignKeyField,
-    BigIntegerField,
     FloatField,
+    ForeignKeyField,
     IntegerField,
+    Model,
+    SqliteDatabase,
+    TextField,
 )
-import json
-from typing import Optional
-import os
 
 DB_PATH = os.getenv("DB_PATH", "data/benchr.db")
 

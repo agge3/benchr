@@ -10,7 +10,9 @@ backend_things/other_caddys_save_for_later/other caddy
 /backend_things/data/
 /backend_things/logs/
 /backend_things/venv/
-
+*migrate_problems.py
+models.py
+*problem_models.py
 __pycache__/
 /backend_things/notes.txt
 *.ruff_cache
