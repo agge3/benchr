@@ -1,12 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { WorkspaceRow } from '~/components/WorkspaceRow';
 import { WorkspaceProvider, useWorkspace } from '~/contexts/WorkspaceContext';
+import { SavedRunsProvider } from '~/contexts/SavedRunsContext';
 import { ErrorBoundary } from '~/components/ui/ErrorBoundary';
 import {
   ResizablePanelGroup,
   ResizablePanel,
   ResizableHandle,
 } from "~/components/ui/resizable";
+import {
+  SandboxSidebarLayout,
+  SandboxSidebarContent,
+} from "~/components/sandbox/SandboxSidebar";
 import type { ImperativePanelHandle } from 'react-resizable-panels';
 
 // Helper component to access workspace context in single view
@@ -17,6 +22,7 @@ function SingleViewLayout({ onToggleCompare }: { onToggleCompare: () => void }) 
     <div className="flex-1 min-h-0 p-4 overflow-hidden">
       <WorkspaceRow
         showToolbar={true}
+        showSidebarToggle={true}
         onRunBenchmark={workspace.benchmark.handleRunBenchmark}
         loading={workspace.benchmark.loading}
         onToggleCompare={onToggleCompare}
@@ -31,6 +37,7 @@ function WorkspaceItem({
   index,
   onRegister,
   showToolbar = false,
+  showSidebarToggle = false,
   onToggleCompare,
   compareMode = false,
   onRunBoth,
@@ -39,6 +46,7 @@ function WorkspaceItem({
   index: number;
   onRegister: (context: ReturnType<typeof useWorkspace>) => void;
   showToolbar?: boolean;
+  showSidebarToggle?: boolean;
   onToggleCompare?: () => void;
   compareMode?: boolean;
   onRunBoth?: () => void;
@@ -56,6 +64,7 @@ function WorkspaceItem({
   return (
     <WorkspaceRow
       showToolbar={showToolbar}
+      showSidebarToggle={showSidebarToggle}
       onToggleCompare={onToggleCompare}
       compareMode={compareMode}
       onRunBoth={onRunBoth}
@@ -111,6 +120,7 @@ function CompareViewLayout({
                   index={index}
                   onRegister={registerWorkspace(index)}
                   showToolbar={index === 0}
+                  showSidebarToggle={index === 0}
                   onToggleCompare={onToggleCompare}
                   compareMode={true}
                   onRunBoth={handleRunBoth}
@@ -135,18 +145,23 @@ export default function SandboxPage() {
 
   return (
     <ErrorBoundary>
-      <div className="h-full flex flex-col bg-benchr-bg-main">
-        {!compareMode ? (
-          <WorkspaceProvider id="workspace-1">
-            <SingleViewLayout onToggleCompare={() => setCompareMode(true)} />
-          </WorkspaceProvider>
-        ) : (
-          <CompareViewLayout
-            workspaceCount={workspaceCount}
-            onToggleCompare={() => setCompareMode(false)}
-          />
-        )}
-      </div>
+      <SavedRunsProvider>
+        <SandboxSidebarLayout
+          defaultOpen={false}
+          sidebar={<SandboxSidebarContent />}
+        >
+          {!compareMode ? (
+            <WorkspaceProvider id="workspace-1">
+              <SingleViewLayout onToggleCompare={() => setCompareMode(true)} />
+            </WorkspaceProvider>
+          ) : (
+            <CompareViewLayout
+              workspaceCount={workspaceCount}
+              onToggleCompare={() => setCompareMode(false)}
+            />
+          )}
+        </SandboxSidebarLayout>
+      </SavedRunsProvider>
     </ErrorBoundary>
   );
 }
