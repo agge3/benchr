@@ -1,8 +1,9 @@
-from IQueue import IQueue
 import asyncio
-import redis.asyncio as aioredis
-from typing import Optional
 import time
+from typing import Optional
+
+import redis.asyncio as aioredis
+from IQueue import IQueue
 
 
 class RateLimitedQueue(IQueue):

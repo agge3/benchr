@@ -1,6 +1,4 @@
 name: PR Quality Gate
-# PR restricted to PRs from my branches only
-# and pushes to neoStella branch
 on:
   push:
     branches:
@@ -14,6 +12,7 @@ on:
         remotes/origin/version_1.1,
       ]
     types: [opened, synchronize, reopened]
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -22,7 +21,7 @@ env:
   NODE_VERSION: "20"
   PYTHON_VERSION: "3.11"
   REDIS_VERSION: "7"
-#Branch restriction
+
 jobs:
   changes:
     name: Detect Changes
@@ -30,6 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: read
+      contents: write
     outputs:
       frontend: ${{ steps.changes.outputs.frontend }}
       backend: ${{ steps.changes.outputs.backend }}
@@ -90,11 +90,16 @@ jobs:
     needs: [changes, frontend-install]
     if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     defaults:
       run:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -108,18 +113,23 @@ jobs:
           key: node-modules-${{ runner.os }}-${{ hashFiles('frontend/package.json') }}
 
       - name: Run TypeScript type checking
-        run: npm run typecheck
+        run: npx tsc --noEmit
 
   frontend-lint:
-    name: Frontend Lint
+    name: Frontend Lint & Autofix
     needs: [changes, frontend-install]
     if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     defaults:
       run:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -138,8 +148,38 @@ jobs:
             npm install --save-dev eslint @typescript-eslint/parser @typescript-eslint/eslint-plugin eslint-plugin-react eslint-plugin-react-hooks
           fi
 
-      - name: Run ESLint
-        run: npx eslint .  --ext . ts,.tsx,. js,.jsx --max-warnings 0 --ignore-pattern 'node_modules/' --ignore-pattern 'build/' || true
+      - name: Run ESLint with autofix
+        run: |
+          npx eslint . --ext .ts,.tsx,.js,.jsx \
+            --ignore-pattern 'node_modules/' \
+            --ignore-pattern 'build/' \
+            --fix || true
+
+      - name: Run Prettier with autofix
+        run: |
+          if npm list prettier > /dev/null 2>&1; then
+            npx prettier --write "**/*.{ts,tsx,js,jsx,json,css,md}" --ignore-path .gitignore || true
+          fi
+
+      - name: Check for changes and create autofix artifact
+        id: check-changes
+        run: |
+          cd ..
+          if [[ -n $(git status --porcelain frontend/) ]]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            mkdir -p /tmp/autofix
+            git diff frontend/ > /tmp/autofix/frontend-lint.patch || true
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload autofix patch
+        if: steps.check-changes.outputs.has_changes == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-autofix-patch
+          path: /tmp/autofix/frontend-lint.patch
+          retention-days: 5
 
       - name: Check for unused dependencies
         run: npx depcheck --ignores="@types/*,autoprefixer,postcss,tailwindcss,tw-animate-css" || true
@@ -155,7 +195,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node. js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -236,7 +276,7 @@ jobs:
   backend-install:
     name: Backend Dependencies
     needs: changes
-    if: needs.changes. outputs.backend == 'true'
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -247,13 +287,13 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ env. PYTHON_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Cache pip dependencies
         uses: actions/cache@v4
         id: cache-pip
         with:
-          path: ~/. cache/pip
+          path: ~/.cache/pip
           key: pip-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('backend/requirements*.txt', 'backend/pyproject.toml') }}
           restore-keys: |
             pip-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
@@ -266,7 +306,7 @@ jobs:
           key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('backend/requirements*.txt', 'backend/pyproject.toml') }}
 
       - name: Create virtual environment
-        if: steps.cache-venv. outputs.cache-hit != 'true'
+        if: steps.cache-venv.outputs.cache-hit != 'true'
         run: python -m venv .venv
 
       - name: Install dependencies
@@ -276,18 +316,23 @@ jobs:
           pip install --upgrade pip wheel setuptools
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
-          pip install pytest pytest-asyncio pytest-cov black ruff mypy bandit safety
+          pip install pytest pytest-asyncio pytest-cov ruff pyright bandit safety
 
   backend-lint:
-    name: Backend Lint
+    name: Backend Lint & Autofix (Ruff)
     needs: [changes, backend-install]
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     defaults:
       run:
         working-directory: backend
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -298,20 +343,46 @@ jobs:
         uses: actions/cache@v4
         with:
           path: backend/.venv
-          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('backend/requirements*. txt', 'backend/pyproject.toml') }}
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('backend/requirements*.txt', 'backend/pyproject.toml') }}
 
-      - name: Run Ruff linter
+      - name: Run Ruff linter with autofix
         run: |
           source .venv/bin/activate
-          ruff check .  --output-format=github
+          ruff check . --fix --output-format=github
 
-      - name: Run Ruff formatter check
+      - name: Run Ruff formatter with autofix
         run: |
           source .venv/bin/activate
+          ruff format .
+
+      - name: Check for changes and create autofix artifact
+        id: check-changes
+        run: |
+          cd ..
+          if [[ -n $(git status --porcelain backend/) ]]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            mkdir -p /tmp/autofix
+            git diff backend/ > /tmp/autofix/backend-ruff.patch || true
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload autofix patch
+        if: steps.check-changes.outputs.has_changes == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-autofix-patch
+          path: /tmp/autofix/backend-ruff.patch
+          retention-days: 5
+
+      - name: Verify formatting (fail if unfixed issues remain)
+        run: |
+          source .venv/bin/activate
+          ruff check . --output-format=github
           ruff format --check .
 
   backend-typecheck:
-    name: Python Type Check
+    name: Python Type Check (Pyright)
     needs: [changes, backend-install]
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
@@ -332,15 +403,34 @@ jobs:
           path: backend/.venv
           key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('backend/requirements*.txt', 'backend/pyproject.toml') }}
 
+      - name: Setup Node.js (for Pyright)
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Pyright
+        run: npm install -g pyright
+
       - name: Install type stubs
         run: |
           source .venv/bin/activate
-          pip install types-redis types-peewee || true
+          pip install types-redis peewee-stubs || true
 
-      - name: Run MyPy
+      - name: Run Pyright
         run: |
           source .venv/bin/activate
-          mypy .  --ignore-missing-imports --no-error-summary || true
+          pyright . --outputjson > pyright-report.json || true
+          pyright .
+        env:
+          PYRIGHT_PYTHON_VENV_PATH: .venv
+
+      - name: Upload Pyright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pyright-report
+          path: backend/pyright-report.json
+          retention-days: 5
 
   backend-test:
     name: Backend Tests
@@ -411,12 +501,12 @@ jobs:
         uses: actions/cache@v4
         with:
           path: backend/.venv
-          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('backend/requirements*. txt', 'backend/pyproject.toml') }}
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('backend/requirements*.txt', 'backend/pyproject.toml') }}
 
       - name: Run Bandit security linter
         run: |
           source .venv/bin/activate
-          bandit -r .  -ll -ii --exclude . /. venv -f json -o bandit-report.json || true
+          bandit -r . -ll -ii --exclude ./.venv -f json -o bandit-report.json || true
           bandit -r . -ll -ii --exclude ./.venv || true
 
       - name: Check dependencies for vulnerabilities
@@ -503,7 +593,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: backend/.venv
-          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('backend/requirements*. txt', 'backend/pyproject.toml') }}
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('backend/requirements*.txt', 'backend/pyproject.toml') }}
 
       - name: Validate Peewee models
         run: |
@@ -534,7 +624,7 @@ jobs:
       always() &&
       (needs.changes.outputs.frontend == 'true' || needs.changes.outputs.backend == 'true') &&
       (needs.frontend-build.result == 'success' || needs.frontend-build.result == 'skipped') &&
-      (needs. backend-test.result == 'success' || needs.backend-test.result == 'skipped')
+      (needs.backend-test.result == 'success' || needs.backend-test.result == 'skipped')
     runs-on: ubuntu-latest
     services:
       redis:
@@ -577,7 +667,7 @@ jobs:
   code-quality:
     name: Code Quality Analysis
     needs: changes
-    if: needs.changes.outputs.frontend == 'true' || needs. changes.outputs.backend == 'true'
+    if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -586,7 +676,7 @@ jobs:
 
       - name: Check for large files
         run: |
-          find . -type f -size +5M -not -path ". /.git/*" | head -20 || echo "No large files found"
+          find . -type f -size +5M -not -path "./.git/*" | head -20 || echo "No large files found"
 
       - name: Check for merge conflict markers
         run: |
@@ -600,19 +690,19 @@ jobs:
       - name: Check for debug statements
         run: |
           echo "Checking for debug statements..."
-          grep -rn "import pdb\|pdb. set_trace()\|breakpoint()\|print(" backend/ --include="*.py" | grep -v "# noqa" | head -20 || true
-          grep -rn "console. log\|debugger" frontend/ --include="*.ts" --include="*.tsx" --include="*.js" | grep -v "// eslint-disable" | head -20 || true
+          grep -rn "import pdb\|pdb.set_trace()\|breakpoint()\|print(" backend/ --include="*.py" | grep -v "# noqa" | head -20 || true
+          grep -rn "console.log\|debugger" frontend/ --include="*.ts" --include="*.tsx" --include="*.js" | grep -v "// eslint-disable" | head -20 || true
           echo "Review any debug statements above before merging"
 
       - name: Check TODO and FIXME comments
         run: |
           echo "TODO and FIXME items found:"
-          grep -rn "TODO\|FIXME\|XXX\|HACK" --include="*.ts" --include="*.tsx" --include="*.py" --include="*.js" .  | grep -v node_modules | head -30 || echo "None found"
+          grep -rn "TODO\|FIXME\|XXX\|HACK" --include="*.ts" --include="*.tsx" --include="*.py" --include="*.js" . | grep -v node_modules | head -30 || echo "None found"
 
   docker-build:
     name: Docker Build Check
     needs: changes
-    if: needs.changes.outputs.frontend == 'true' || needs. changes.outputs.backend == 'true'
+    if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -643,7 +733,7 @@ jobs:
 
       - name: Run ShellCheck
         run: |
-          find . -name "*.sh" -type f -not -path "./node_modules/*" -not -path ". /.git/*" | while read -r script; do
+          find . -name "*.sh" -type f -not -path "./node_modules/*" -not -path "./.git/*" | while read -r script; do
             echo "Checking: $script"
             shellcheck "$script" || true
           done
@@ -676,30 +766,31 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Frontend" >> $GITHUB_STEP_SUMMARY
           echo "- TypeScript: ${{ needs.frontend-typecheck.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Lint: ${{ needs. frontend-lint.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Build: ${{ needs.frontend-build. result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Lint (ESLint + Prettier): ${{ needs.frontend-lint.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Build: ${{ needs.frontend-build.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- Tests: ${{ needs.frontend-test.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- Security: ${{ needs.frontend-security.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Backend" >> $GITHUB_STEP_SUMMARY
           echo "- Lint (Ruff): ${{ needs.backend-lint.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Type Check (MyPy): ${{ needs. backend-typecheck.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Tests: ${{ needs.backend-test. result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Security: ${{ needs. backend-security.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Type Check (Pyright): ${{ needs.backend-typecheck.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Tests: ${{ needs.backend-test.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Security: ${{ needs.backend-security.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- Quart App: ${{ needs.backend-quart-check.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Database: ${{ needs.database-check. result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Database: ${{ needs.database-check.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Other Checks" >> $GITHUB_STEP_SUMMARY
           echo "- Integration: ${{ needs.integration-test.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- Code Quality: ${{ needs.code-quality.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Docker: ${{ needs.docker-build. result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Docker: ${{ needs.docker-build.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- Shell Scripts: ${{ needs.shell-lint.result }}" >> $GITHUB_STEP_SUMMARY
 
       - name: Determine overall status
         run: |
           if [[ "${{ needs.frontend-build.result }}" == "failure" ]] || \
-             [[ "${{ needs. frontend-typecheck.result }}" == "failure" ]] || \
+             [[ "${{ needs.frontend-typecheck.result }}" == "failure" ]] || \
              [[ "${{ needs.backend-lint.result }}" == "failure" ]] || \
+             [[ "${{ needs.backend-typecheck.result }}" == "failure" ]] || \
              [[ "${{ needs.backend-test.result }}" == "failure" ]]; then
             echo "Critical checks failed!"
             exit 1

@@ -1,7 +1,8 @@
-from models import db, User
-from playhouse.migrate import migrate, SqliteMigrator
-from peewee import CharField
 import secrets
+
+from models import User, db
+from peewee import CharField
+from playhouse.migrate import SqliteMigrator, migrate
 
 # Create migrator
 migrator = SqliteMigrator(db)
