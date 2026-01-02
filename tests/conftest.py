@@ -64,14 +64,13 @@ def test_db():
     In-memory SQLite database for testing Peewee models.
     Creates tables before test, drops after.
     """
+    from models import Job, db
     from peewee import SqliteDatabase
-    from models import db, Job
 
     test_database = SqliteDatabase(":memory:")
 
     original_db = db
-    db.initialize(test_database)
-
+    Job._meta.database = test_database
     with test_database:
         test_database.create_tables([Job], safe=True)
 

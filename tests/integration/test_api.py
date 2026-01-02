@@ -7,9 +7,8 @@ Run with: pytest tests/integration/test_api.py -v
 To skip if Redis unavailable, tests auto-skip via fixture.
 """
 
-import pytest
-import json
 
+import pytest
 
 pytestmark = [pytest.mark.integration, pytest.mark.asyncio]
 
@@ -20,9 +19,7 @@ class TestHealthEndpoint:
     async def test_health_returns_ok(self, app_client):
         """Health endpoint should return 200 OK."""
         response = await app_client.get("/api/health")
-
         assert response.status_code == 200
-
         data = await response.get_json()
         assert data["status"] == "ok"
 
