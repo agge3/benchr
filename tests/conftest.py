@@ -7,7 +7,7 @@ Usage:
     - API tests use `app_client` fixture (Quart test client)
 """
 
-import asyncio
+import asyncio  # noqa: F401
 import os
 import sys
 
@@ -28,7 +28,7 @@ def fake_redis():
             assert await fake_redis.get("key") == "value"
     """
     fakeredis = pytest.importorskip("fakeredis")
-    import fakeredis.aioredis
+    import fakeredis.aioredis  # noqa: F811
 
     return fakeredis.aioredis.FakeRedis(decode_responses=True)
 
@@ -69,7 +69,7 @@ def test_db():
 
     test_database = SqliteDatabase(":memory:")
 
-    original_db = db
+    original_db = db  # noqa: F841
     Job._meta.database = test_database
     with test_database:
         test_database.create_tables([Job], safe=True)

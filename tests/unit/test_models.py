@@ -4,7 +4,7 @@ Unit tests for Peewee models.
 Run with: pytest tests/unit/test_models.py -v
 """
 
-import pytest
+import pytest  # noqa: I001
 from datetime import datetime
 
 
@@ -73,6 +73,7 @@ class TestJobModel:
     def test_job_with_result(self, test_db):
         """Job should store result as JSON string."""
         import json
+
         from models import Job
 
         job = Job.create(
@@ -118,11 +119,12 @@ class TestJobModel:
 
     def test_list_jobs_ordered(self, test_db):
         """Jobs should be retrievable in order."""
+        import time  # noqa: F401
+
         from models import Job
-        import time
 
         job1 = Job.create(code="1", lang="c", compiler="gcc", opts="", status="queued")
-        job2 = Job.create(code="2", lang="c", compiler="gcc", opts="", status="queued")
+        job2 = Job.create(code="2", lang="c", compiler="gcc", opts="", status="queued")  # noqa: F841
         job3 = Job.create(code="3", lang="c", compiler="gcc", opts="", status="queued")
 
         jobs = list(Job.select().order_by(Job.id.desc()).limit(3))

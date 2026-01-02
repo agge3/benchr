@@ -6,7 +6,6 @@ Run with: pytest tests/unit/test_queue.py -v
 
 import pytest
 
-
 pytestmark = pytest.mark.unit
 
 
