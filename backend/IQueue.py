@@ -1,5 +1,6 @@
-from abc import abstractmethod
 import queue
+from abc import abstractmethod
+
 import redis
 from dotenv import load_dotenv
 

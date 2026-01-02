@@ -16,7 +16,7 @@ models.py
 __pycache__/
 /backend_things/notes.txt
 *.ruff_cache
-
+*settings.json
 
 *frontend_things/notes.txt
 /frontend_things/

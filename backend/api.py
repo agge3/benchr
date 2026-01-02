@@ -1,8 +1,8 @@
 import asyncio
 import json
 import logging
-from config import Config
 import sys
+from asyncio.events import os
 
 import redis.asyncio as aioredis
 from config import Config

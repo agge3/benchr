@@ -1,6 +1,7 @@
 import json
 import os
-from datetime import datetime
+
+#from datetime import datetime
 from typing import Optional
 
 from peewee import (
@@ -96,7 +97,7 @@ class JobMetrics(BaseModel):
     max_rss_kb = IntegerField(null=True)
     page_faults = IntegerField(null=True)
 
-    class Meta:
+    class Meta:  # pyright: ignore[reportIncompatibleVariableOverride]
         table_name = "job_metrics"
 
 
