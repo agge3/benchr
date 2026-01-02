@@ -1,9 +1,10 @@
-from abc import ABC, abstractmethod
-from typing import Optional, Dict, Set
-import redis.asyncio as aioredis
-import json
 import asyncio
+import json
 import logging
+from abc import ABC, abstractmethod
+from typing import Dict, Optional, Set  # noqa: UP035
+
+import redis.asyncio as aioredis
 
 logger = logging.getLogger(__name__)
 

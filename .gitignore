@@ -17,7 +17,7 @@ __pycache__/
 /backend_things/notes.txt
 *.ruff_cache
 *settings.json
-
+*.pytest_cache
 *frontend_things/notes.txt
 /frontend_things/
 /backend_things/
@@ -40,3 +40,4 @@ venv
 data
 
 logs
+note.md

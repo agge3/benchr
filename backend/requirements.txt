@@ -3,3 +3,10 @@ quart-cors
 peewee
 redis
 python-dotenv
+pytest
+pytest-asyncio
+pytest-cov
+pytest-xdist
+pytest-timeout
+fakeredis
+hypothesis
