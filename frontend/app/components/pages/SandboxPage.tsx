@@ -61,10 +61,6 @@ function WorkspaceItem({
 		onRegister(workspace);
 	}, [onRegister, workspace]);
 
-  useEffect(() => {
-    onRegister(workspaceRef);  // Pass the ref object once
-  }, [onRegister]);
-
   return (
     <WorkspaceRow
       showToolbar={showToolbar}
