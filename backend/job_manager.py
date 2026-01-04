@@ -1,17 +1,19 @@
-from dataclasses import dataclass
-import os
 import asyncio
-from typing import Dict, Optional, List
-import time
+import contextlib
+import json  # noqa: F401
+import os
+import shutil
 import struct
-from util import ISerializer, JsonSerializer
-from rate_limiter import RateLimitedQueue
-from job_cache import JobCache
-from IPubSub import get_pubsub
+import time
+from dataclasses import dataclass
+from typing import Optional, dict, list  # noqa: UP035
+
 import env
 from dotenv import load_dotenv
-import json
-import shutil
+from IPubSub import get_pubsub
+from job_cache import JobCache
+from rate_limiter import RateLimitedQueue
+from util import ISerializer, JsonSerializer
 
 load_dotenv()
 
@@ -44,7 +46,7 @@ class Container:
     log: str
     vsock: str
     port: int
-    handle: Optional[asyncio.subprocess.Process] = None
+    handle: Optional[asyncio.subprocess.Process] = None  # noqa: UP045
     ready: bool = False
 
 
@@ -74,8 +76,8 @@ class JobManager:
         self._fc = Firecracker()
         self._ctr_run = "/var/run/firecracker"
         self._num_vms = num_vms
-        self._ctrs_q: List[Container] = [] # queue
-        self._pending: Dict[int, asyncio.Future] = {}
+        self._ctrs_q: list[Container] = [] # queue
+        self._pending: dict[int, asyncio.Future] = {}
         self.event = asyncio.Event()
         self._serializer = ser or JsonSerializer()
         load_dotenv(env)
@@ -144,7 +146,7 @@ FileNotFoundError):
             *[self._check_ready(ctr) for ctr in self._ctrs_q]
         )
 
-        for ctr, success in zip(self._ctrs_q, results):
+        for ctr, success in zip(self._ctrs_q, results):  # noqa: B905
             if not success:
                 raise RuntimeError(f"Failed to start container pool: container"
                   f"{ctr.cid} failed to start")
@@ -169,13 +171,13 @@ FileNotFoundError):
             try:
                 os.makedirs(self._fc.reports_path, exist_ok=True)
             except Exception as e:
-                raise RuntimeError(f"makedirs failed: {e}")
+                raise RuntimeError(f"makedirs failed: {e}")  # noqa: B904
 
         if not os.path.exists(self._ctr_run):
             try:
                 os.makedirs(self._ctr_run, exist_ok=True)
             except Exception as e:
-                raise RuntimeError(f"makedirs failed: {e}")
+                raise RuntimeError(f"makedirs failed: {e}")  # noqa: B904
 
         for i in range(self._num_vms):
             cid = 3 + i  # NOTE: cid needs to start at 3!
@@ -190,7 +192,7 @@ FileNotFoundError):
                 os.makedirs(reports_path, exist_ok=True)
                 os.makedirs(run_path, exist_ok=True)
             except Exception as e:
-                raise RuntimeError(f"makedirs failed: {e}")
+                raise RuntimeError(f"makedirs failed: {e}")  # noqa: B904
 
             # Shared VM deployment - copy mount files
             for f in self._mnt:
@@ -228,7 +230,7 @@ FileNotFoundError):
                     f.write(ser)
                     vmf.write(vm_ser)
             except Exception as e:
-                raise RuntimeError(f"json dump failed: {e}")
+                raise RuntimeError(f"json dump failed: {e}")  # noqa: B904
 
             # NOTE: NOT ready until started!
             ctr = Container(
@@ -241,7 +243,7 @@ FileNotFoundError):
             )
             self._ctrs_q.append(ctr)
 
-    def get_ready(self) -> Optional[Container]:
+    def get_ready(self) -> Optional[Container]:  # noqa: UP045
         """Get first available container from pool"""
         for ctr in self._ctrs_q:
             if ctr.ready:
@@ -332,7 +334,7 @@ FileNotFoundError):
             await self._start_ctr(ctr)
             await self._check_ready(ctr)
         except Exception as e:
-            raise RuntimeError(f"Failed to reset container {ctr.cid}: {e}")
+            raise RuntimeError(f"Failed to reset container {ctr.cid}: {e}")  # noqa: B904
 
     async def submit_job(self, ctr: Container, data: dict) -> asyncio.Future:
         """Submit job for async execution"""
@@ -352,7 +354,7 @@ FileNotFoundError):
 
         return future
 
-    def get_finished(self) -> List[tuple]:
+    def get_finished(self) -> list[tuple]:
         """Collect completed job results"""
         finished = []
         to_remove = []
@@ -439,10 +441,8 @@ async def main():
             # Cancel pending tasks
             for task in pending:
                 task.cancel()
-                try:
+                with contextlib.suppress(asyncio.CancelledError):
                     await task
-                except asyncio.CancelledError:
-                    pass
 
             # Clear internal event
             manager.event.clear()
