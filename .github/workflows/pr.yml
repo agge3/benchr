@@ -8,8 +8,7 @@ on:
       [
         main,
         development,
-        remotes/origin/version_1.0,
-        remotes/origin/version_1.1,
+        remotes/origin/version_*,
       ]
     types: [opened, synchronize, reopened]
 
