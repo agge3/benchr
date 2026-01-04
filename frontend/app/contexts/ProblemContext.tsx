@@ -161,14 +161,14 @@ export function ProblemProvider({ problem, children }: ProblemProviderProps) {
 
   // Process result from "Run Code"
   const processRunCodeResult = useCallback((jobData: JobData) => {
-    const output = jobData.result?.result?.output || '';
+    const output = jobData.result?.output || '';
     setRunCodeOutput(output);
     setIsRunningCode(false);
   }, []);
 
   // Process result from "Run Tests"
   const processTestResult = useCallback((jobData: JobData) => {
-    const output = jobData.result?.result?.output || '';
+    const output = jobData.result?.output || '';
     const outputLines = output.trim().split('\n');
 
     // Store full output so user can see it in Output tab

@@ -4,6 +4,7 @@ import { Button } from '~/components/ui/button';
 import { EditorPanel } from '~/components/editor/EditorPanel';
 import { ResultsPanel } from '~/components/benchmark/ResultsPanel';
 import { useWorkspace } from '~/contexts/WorkspaceContext';
+import { SandboxSidebarTrigger } from '~/components/sandbox/SandboxSidebar';
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -14,6 +15,8 @@ import type { ImperativePanelHandle } from 'react-resizable-panels';
 interface WorkspaceRowProps {
   /** Show toolbar with Run Benchmark and Compare toggle */
   showToolbar?: boolean;
+  /** Show sidebar toggle button in toolbar */
+  showSidebarToggle?: boolean;
   /** Callback when Run Benchmark is clicked */
   onRunBenchmark?: () => void;
   /** Loading state for benchmark */
@@ -35,6 +38,7 @@ interface WorkspaceRowProps {
  */
 export function WorkspaceRow({
   showToolbar = false,
+  showSidebarToggle = false,
   onRunBenchmark,
   loading = false,
   onToggleCompare,
@@ -60,7 +64,15 @@ export function WorkspaceRow({
     <div className="flex flex-col h-full gap-2">
       {/* Optional Toolbar */}
       {showToolbar && (
-        <div className="px-4 py-2 bg-benchr-bg-header rounded-lg border border-benchr-border shadow-lg flex items-center justify-end gap-3">
+        <div className="px-4 py-2 bg-benchr-bg-header rounded-lg border border-benchr-border shadow-lg flex items-center gap-3">
+          {/* Sidebar toggle on the far left */}
+          {showSidebarToggle && (
+            <SandboxSidebarTrigger />
+          )}
+
+          {/* Spacer to push other buttons to the right */}
+          <div className="flex-1" />
+
           {onToggleCompare && (
             <Button
               onClick={onToggleCompare}
@@ -108,7 +120,7 @@ export function WorkspaceRow({
             <EditorPanel />
           </ResizablePanel>
 
-          <ResizableHandle withHandle onDoubleClick={resetPanels} />
+          <ResizableHandle onDoubleClick={resetPanels} />
 
           <ResizablePanel ref={resultsPanelRef} defaultSize={50} minSize={30}>
             <ResultsPanel />
