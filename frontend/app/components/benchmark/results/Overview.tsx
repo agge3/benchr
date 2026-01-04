@@ -35,12 +35,12 @@ export function OverviewView({ jobData }: OverviewViewProps) {
   const executionTime = result.time?.elapsed_time_total_seconds !== undefined
     ? `${(result.time.elapsed_time_total_seconds * 1000).toFixed(2)} ms`
     : 'N/A';
-  
+
   // Memory is in KB, convert to MB
   const memoryUsage = result.time?.maximum_resident_set_size
     ? `${(result.time.maximum_resident_set_size / 1024).toFixed(2)} MB`
     : 'N/A';
-  
+
   const cacheHitRatio = 'Coming Soon'; // Placeholder for future implementation
 
   return (
@@ -70,7 +70,7 @@ export function OverviewView({ jobData }: OverviewViewProps) {
                 </span>
               </div>
             </div>
-            
+
             <h3 className="text-sm font-medium mb-3 text-benchr-text-light">Error Details</h3>
             <pre className="bg-benchr-bg-header border border-benchr-border rounded p-4 text-sm text-benchr-status-error overflow-x-auto whitespace-pre-wrap font-mono">
               {hasCompilationError
