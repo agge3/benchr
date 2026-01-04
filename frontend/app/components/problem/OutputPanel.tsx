@@ -139,15 +139,15 @@ export function OutputPanel() {
                           : 'bg-red-500/5 border-red-500/30'
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-medium text-benchr-text-light">
-                          Test Case {index + 1}
-                        </span>
+                      <div className="flex items-center gap-2 mb-2">
                         {result.passed ? (
                           <CheckCircle className="h-3.5 w-3.5 text-green-400" />
                         ) : (
                           <XCircle className="h-3.5 w-3.5 text-red-400" />
                         )}
+                        <span className="text-xs font-medium text-benchr-text-light">
+                          Test Case {index + 1}
+                        </span>
                       </div>
 
                       <div className="space-y-1.5 text-xs">

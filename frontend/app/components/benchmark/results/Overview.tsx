@@ -22,10 +22,8 @@ function cleanOutput(output: string): string {
 }
 
 export function OverviewView({ jobData }: OverviewViewProps) {
-  // XXX Nested JSON.....
-  const result = jobData.result?.result || jobData.result;
+  const result = jobData.result;
   if (!result) return null;
-  console.log('result:', JSON.stringify(result, null, 2));
 
   // Determine error state
   const hasCompilationError = result.compilation && !result.compilation.success;
