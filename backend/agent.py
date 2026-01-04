@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-import socket
-
 # import struct
+import contextlib
 import json
-import subprocess
-import tempfile
 import os
 import shutil
+import socket
+import subprocess
+import tempfile
 
 # import env
-from util import send_sock, rec_sock, JsonSerializer
+from util import JsonSerializer, rec_sock, send_sock
 
 EXECUTE_SCRIPT = "/mnt/deploy/execute.sh"
 CFG = "vm_config.json"
@@ -48,7 +48,7 @@ def execute_job(job_data: dict) -> dict:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
 
         if os.path.exists(result_json_path):
-            with open(result_json_path, "r") as f:
+            with open(result_json_path) as f:
                 result = json.load(f)
             print(
                 f"[Agent] Execution complete, success: {result.get('success', False)}"
@@ -70,10 +70,8 @@ def execute_job(job_data: dict) -> dict:
         result = {"success": False, "error": str(e)}
         print(f"[Agent] Execution error: {e}")
     finally:
-        try:
+        with contextlib.suppress(Exception):
             shutil.rmtree(tmpdir)
-        except Exception:
-            pass
 
     return result
 
@@ -82,7 +80,7 @@ def main():
     """Main agent loop - listen on vsock and process jobs"""
     # Read VM configuration
     try:
-        with open(CFG, "r") as f:
+        with open(CFG) as f:
             config = json.load(f)
         cid = config.get("vsock", {}).get("cid", socket.VMADDR_CID_ANY)
         port = config.get("vsock", {}).get("port", VSOCK_PORT)
@@ -147,10 +145,8 @@ def main():
             continue
         finally:
             if conn:
-                try:
+                with contextlib.suppress(Exception):
                     conn.close()
-                except Exception:
-                    pass
 
     sock.close()
 

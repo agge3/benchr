@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import json
 import logging
 import sys
@@ -70,10 +71,8 @@ async def shutdown():
 
     if pubsub_task:
         pubsub_task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await pubsub_task
-        except asyncio.CancelledError:
-            pass
 
     if queue:
         await queue.disconnect()
@@ -208,7 +207,7 @@ async def ws():
                                 {"type": "subscribed", "job_id": job_id}
                             )
                             print(
-                                f"[WS] Client subscribed to job {job_id}, total subscribers: {len(ws_clients[job_id])}",
+                                f"[WS] Client subscribed to job {job_id}, total subscribers: {len(ws_clients[job_id])}",  # noqa: E501
                                 flush=True,
                             )
                         else:
@@ -263,10 +262,8 @@ async def ws():
         # Cancel pending tasks
         for task in pending:
             task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await task
-            except asyncio.CancelledError:
-                pass
 
         # Check for exceptions
         for task in done:

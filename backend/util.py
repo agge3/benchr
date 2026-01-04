@@ -1,12 +1,12 @@
-from dataclasses import dataclass
+import json
+import socket
 import struct
+import subprocess
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
 # from dotenv import load_dotenv
 from typing import Optional
-import subprocess
-import socket
-from abc import ABC, abstractmethod
-import json
 
 
 @dataclass
@@ -16,7 +16,7 @@ class Container:
     vm_cfg: str
     vsock: str
     port: int
-    sock: Optional[socket.socket] = None
+    sock: Optional[socket.socket] = None  # noqa: UP045
     ready: bool = False
 
 
