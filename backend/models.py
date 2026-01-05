@@ -66,7 +66,7 @@ class Job(BaseModel):
     class Meta:
         table_name = "jobs"
 
-    def get_result(self) -> Optional[dict]:
+    def get_result(self) -> Optional[dict]:  # noqa: UP045
         if self.result:
             return json.loads(self.result)
         return None
