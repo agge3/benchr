@@ -82,7 +82,7 @@ function CompareViewLayout({
 	onToggleCompare: () => void;
 }) {
 	const [loadingBoth, setLoadingBoth] = useState(false);
-	const rowRefs = useRef<(ImperativePanelHandle | null)[]>([]);
+	const rowRefs = useRef<(ImperativePanelHandle | undefined)[]>([]);
 	const workspaceRefs = useRef<(WorkspaceContextType | null)[]>([]);
 
 	const resetVerticalPanels = () => {
@@ -134,8 +134,9 @@ function CompareViewLayout({
 						{index < workspaceCount - 1 && (
 							<ResizableHandle withHandle onDoubleClick={resetVerticalPanels} />
 						)}
-					</div>
-				))}
+						</>
+
+        ))}
 			</ResizablePanelGroup>
 		</div>
 	);

@@ -56,7 +56,6 @@ class Job(BaseModel):
         max_length=20, default="queued"
     )  # queued, running, completed, failed
 
-    # Job results (full JSON from execute.sh)
     result = TextField(null=True)
 
     # Timestamps

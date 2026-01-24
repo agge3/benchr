@@ -36,9 +36,7 @@ id = AutoField(primary_key=True)
     class Meta:
         table_name = "test_cases"
         indexes = (
-            # Index on (problem_id, test_order) for ordered retrieval - unique constraint
             (("problem", "test_order"), True),
-            # Index on (problem_id, is_hidden) for filtering sample vs hidden tests
             (("problem", "is_hidden"), False),
         )
         constraints = [
