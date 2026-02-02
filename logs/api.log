@@ -1,0 +1,10 @@
+2026-01-03 11:19:33,056 - job_cache - INFO - [JobCache] Connected to Redis: redis://localhost:6379/0
+2026-01-03 11:19:33,056 - job_cache - INFO - [JobCache] Connected (database passthrough mode)
+2026-01-03 11:19:33,066 - asyncio - INFO - <Server sockets=(<asyncio.TransportSocket fd=8, family=2, type=1, proto=0, laddr=('0.0.0.0', 5000)>,)> is serving
+2026-01-03 11:19:33,067 - hypercorn.error - INFO - Running on http://0.0.0.0:5000 (CTRL + C to quit)
+2026-01-03 12:13:33,157 - job_cache - INFO - [JobCache] Disconnected
+2026-01-03 13:59:31,949 - job_cache - INFO - [JobCache] Connected to Redis: redis://localhost:6379/0
+2026-01-03 13:59:31,949 - job_cache - INFO - [JobCache] Connected (database passthrough mode)
+2026-01-03 13:59:31,952 - asyncio - INFO - <Server sockets=(<asyncio.TransportSocket fd=8, family=2, type=1, proto=0, laddr=('0.0.0.0', 5000)>,)> is serving
+2026-01-03 13:59:31,953 - hypercorn.error - INFO - Running on http://0.0.0.0:5000 (CTRL + C to quit)
+2026-01-03 14:52:54,592 - job_cache - INFO - [JobCache] Disconnected

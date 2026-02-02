@@ -16,7 +16,7 @@ export const LANGUAGE_CONFIGS: Record<Language, LanguageConfig> = {
 		compiler: 'gcc',
 		opts: '-O2 -std=c11'
 	},
-
+/*TODO: Fix Java configuration. Java is being compiled as C++. */
 	java: {
 		defaultCode: '// Write your Java code here\npublic class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello, Benchr!");\n    }\n}',
 		compiler: 'javac',

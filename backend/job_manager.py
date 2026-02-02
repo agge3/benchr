@@ -6,7 +6,7 @@ import shutil
 import struct
 import time
 from dataclasses import dataclass
-from typing import Optional, dict, list  # noqa: UP035
+from typing import Optional  # noqa: UP035
 
 import env
 from dotenv import load_dotenv

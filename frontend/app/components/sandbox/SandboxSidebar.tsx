@@ -157,6 +157,8 @@ function SandboxSidebarSection({
 
 /**
  * Sidebar content with file tree and saved runs sections
+ * For Stella
+ *  TODO: Implement file tree functionality.
  */
 function SandboxSidebarContent() {
   const { runs, loading, deleteRun } = useSavedRunsContext();
